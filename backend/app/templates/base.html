@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ProCompta{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="h-full flex flex-col bg-slate-50 font-sans antialiased">
+
+  {% include "partials/navbar.html" %}
+
+  <div
+    class="relative flex flex-1 overflow-hidden"
+    x-data="{
+      collapsed: localStorage.getItem('procompta-sidebar') === 'true',
+      toggle() {
+        this.collapsed = !this.collapsed;
+        localStorage.setItem('procompta-sidebar', this.collapsed);
+      }
+    }"
+  >
+    {% include "partials/sidebar.html" %}
+
+    <!-- Bouton toggle sur la jonction sidebar / contenu -->
+    <button
+      @click="toggle()"
+      :style="{ left: collapsed ? 'calc(4rem + 5px)' : 'calc(16rem + 5px)' }"
+      :title="collapsed ? 'Ouvrir le menu' : 'Réduire le menu'"
+      class="fixed top-[76px] z-30 -translate-x-1/2 transition-[left] duration-300 ease-in-out
+             w-5 h-5 rounded-full bg-slate-700 border border-slate-600
+             flex items-center justify-center
+             text-slate-400 hover:text-white hover:bg-slate-600"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
+           class="w-3 h-3 transition-transform duration-300" :class="collapsed ? 'rotate-180' : ''">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+      </svg>
+    </button>
+
+    <main class="flex-1 overflow-auto">
+      <div class="p-8">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>

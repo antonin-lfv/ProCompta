@@ -1,0 +1,35 @@
+# Environnement
+.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Storage (garder les dossiers via .gitkeep, ignorer le contenu)
+storage/documents/*
+storage/previews/*
+!storage/documents/.gitkeep
+!storage/previews/.gitkeep
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+
+# Logs
+*.log
