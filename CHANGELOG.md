@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.2.5] — 2026-04-24
+
+### Ajouté
+- Boutons **Télécharger**, **Envoyer** (ouvre le client mail avec sujet pré-rempli) et **Imprimer** (ouvre le fichier dans un nouvel onglet) dans le header de la page d'édition, séparés du bouton Supprimer par un diviseur
+
+### Modifié
+- **Alertes dashboard** — les warnings portent désormais sur les documents sans **type** et sans **correspondant** (les tags ne sont plus requis)
+- **Vue `/documents`** — filtre `no_tags` remplacé par `no_type` ; pill et sous-titre mis à jour en conséquence
+- **Colonnes badges** — Catégorie, Type et Tags sont centrées dans tous les tableaux (tableau de bord, vues année, tous les documents)
+- **Correction effet de bord catégorie** — passer en "Autre" vide immédiatement les champs financiers et la date de paiement via `$watch` Alpine.js ; `payDate` remonté dans `docEditData()` pour être accessible depuis le watcher
+- **Vue "Toutes les années"** — affiche le solde net TTC (recettes − dépenses) coloré vert/rouge au lieu de la somme brute
+- **Titre vue année** — affiché "Année 2026" au lieu de "2026" (page, `<h1>` et lien sidebar)
+
+---
+
+## [0.2.0] — 2026-04-24
+
+Structuration des documents autour de trois catégories métier fixes.
+
+### Ajouté
+
+- **Champ `category`** sur les documents — enum `depense | recette | autre`, migration Alembic avec `server_default = autre` pour les documents existants
+- **Sélecteur de catégorie** en haut du formulaire d'édition — 3 boutons radio stylisés (rouge / vert / gris), sélection obligatoire
+- **Masquage conditionnel** des champs financiers (HT, TVA, TTC) et de la date de paiement via Alpine.js `x-show` quand la catégorie est "Autre"
+- **Vue année restructurée** — 3 sections distinctes (Dépenses / Recettes / Autres), chacune avec son propre total TTC et un compteur de documents ; sections masquées si vides
+- **Largeurs de colonnes fixes** dans les tableaux via `<colgroup>` + `table-fixed` ; scroll horizontal sur petit écran
+- **Dashboard** — nouvelles stats : total dépenses TTC, total recettes TTC, solde net (coloré rouge/vert selon signe) ; badge de catégorie sur les documents récents
+- **Header de la vue année** — affichage inline des totaux dépenses (-X €) et recettes (+X €) en rouge/vert
+
+### Modifié
+
+- Schémas Pydantic `DocumentCreate`, `DocumentUpdate`, `DocumentResponse` — ajout du champ `category`
+- Filtre `list_documents` de l'API — accepte désormais un paramètre `category`
+- `document_update_form` — les champs financiers sont mis à `None` côté serveur quand `category = autre`
+
+---
+
 ## [0.1.0] — 2026-04-23
 
 Première version stable du MVP.

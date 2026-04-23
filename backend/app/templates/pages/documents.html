@@ -11,8 +11,8 @@
     <div>
       <h1 class="text-2xl font-bold text-slate-900">Documents</h1>
       <p class="text-sm text-slate-500 mt-0.5">
-        {% if no_tags %}
-          {{ documents|length }} document{{ "s" if documents|length != 1 else "" }} sans tags
+        {% if no_type %}
+          {{ documents|length }} document{{ "s" if documents|length != 1 else "" }} sans type
         {% elif no_correspondent %}
           {{ documents|length }} document{{ "s" if documents|length != 1 else "" }} sans correspondant
         {% else %}
@@ -23,17 +23,17 @@
 
     <!-- Filter pills -->
     <div class="flex items-center gap-2">
-      <a href="/documents?no_tags=1"
+      <a href="/documents?no_type=1"
          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors
-                {{ 'bg-amber-100 text-amber-800 border-amber-300' if no_tags else 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
-        Sans tags
+                {{ 'bg-amber-100 text-amber-800 border-amber-300' if no_type else 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
+        Sans type
       </a>
       <a href="/documents?no_correspondent=1"
          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors
                 {{ 'bg-amber-100 text-amber-800 border-amber-300' if no_correspondent else 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' }}">
         Sans correspondant
       </a>
-      {% if no_tags or no_correspondent %}
+      {% if no_type or no_correspondent %}
       <a href="/documents"
          class="px-3 py-1.5 text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors">
         Tous
@@ -51,8 +51,8 @@
             <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Titre</th>
             <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Date</th>
             <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Correspondant</th>
-            <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Type</th>
-            <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Tags</th>
+            <th class="text-center text-xs font-semibold text-slate-500 px-4 py-3">Type</th>
+            <th class="text-center text-xs font-semibold text-slate-500 px-4 py-3">Tags</th>
             <th class="text-right text-xs font-semibold text-slate-500 px-4 py-3">Montant TTC</th>
             <th class="w-16"></th>
           </tr>
@@ -73,7 +73,7 @@
             <td class="px-4 py-3 text-slate-500 whitespace-nowrap">
               {{ doc.correspondent.name if doc.correspondent else "—" }}
             </td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 text-center">
               {% if doc.document_type %}
                 {{ badge(doc.document_type.name, doc.document_type.color) }}
               {% else %}
@@ -81,7 +81,7 @@
               {% endif %}
             </td>
             <td class="px-4 py-3">
-              <div class="flex flex-wrap gap-1">
+              <div class="flex flex-wrap gap-1 justify-center">
                 {% for tag in doc.tags %}
                   {{ badge(tag.name, tag.color) }}
                 {% else %}

@@ -89,10 +89,10 @@ async def _tags(session: AsyncSession) -> list[Tag]:
 async def dashboard(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
     today = date.today()
 
-    no_tags_count, no_correspondent_count = [
+    no_type_count, no_correspondent_count = [
         (await session.scalar(q)) or 0
         for q in [
-            select(func.count(Document.id)).where(~Document.id.in_(select(document_tags.c.document_id))),
+            select(func.count(Document.id)).where(Document.document_type_id.is_(None)),
             select(func.count(Document.id)).where(Document.correspondent_id.is_(None)),
         ]
     ]
@@ -122,7 +122,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         "total_recettes": total_recettes,
         "solde": solde,
         "solde_color": "green" if solde >= 0 else "red",
-        "no_tags_count": no_tags_count,
+        "no_type_count": no_type_count,
         "no_correspondent_count": no_correspondent_count,
         "recent_documents": list(recent_result.scalars().all()),
     })
@@ -136,7 +136,14 @@ async def years_list(request: Request, session: AsyncSession = Depends(get_sessi
         select(
             extract("year", Document.document_date).label("year"),
             func.count(Document.id).label("count"),
-            func.sum(Document.amount_ttc).label("total_ttc"),
+            func.coalesce(
+                func.sum(Document.amount_ttc).filter(Document.category == CategoryEnum.recette),
+                0,
+            ).label("total_recettes"),
+            func.coalesce(
+                func.sum(Document.amount_ttc).filter(Document.category == CategoryEnum.depense),
+                0,
+            ).label("total_depenses"),
         )
         .group_by(extract("year", Document.document_date))
         .order_by(extract("year", Document.document_date).desc())
@@ -218,7 +225,7 @@ async def year_view(
 @router.get("/documents", response_class=HTMLResponse)
 async def documents_list(
     request: Request,
-    no_tags: bool = Query(default=False),
+    no_type: bool = Query(default=False),
     no_correspondent: bool = Query(default=False),
     search: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
@@ -231,8 +238,8 @@ async def documents_list(
             selectinload(Document.document_type),
         )
     )
-    if no_tags:
-        stmt = stmt.where(~Document.id.in_(select(document_tags.c.document_id)))
+    if no_type:
+        stmt = stmt.where(Document.document_type_id.is_(None))
     if no_correspondent:
         stmt = stmt.where(Document.correspondent_id.is_(None))
     if search and search.strip():
@@ -240,8 +247,8 @@ async def documents_list(
     stmt = stmt.order_by(Document.document_date.desc(), Document.created_at.desc())
     docs = list((await session.execute(stmt)).scalars().all())
 
-    if no_tags:
-        back_url = "/documents?no_tags=1"
+    if no_type:
+        back_url = "/documents?no_type=1"
     elif no_correspondent:
         back_url = "/documents?no_correspondent=1"
     else:
@@ -249,7 +256,7 @@ async def documents_list(
 
     return templates.TemplateResponse(request, "pages/documents.html", {
         "documents": docs,
-        "no_tags": no_tags,
+        "no_type": no_type,
         "no_correspondent": no_correspondent,
         "search": search or "",
         "back_url_encoded": quote(back_url, safe=""),

@@ -1,6 +1,6 @@
 # ProCompta — Suivi des tâches
 
-## Version courante : `v0.1.0` ✅
+## Version courante : `v0.2.5` ✅
 
 ---
 
@@ -64,37 +64,30 @@
 
 ---
 
-### v0.2 — Catégories métier (Dépense / Recette / Autre)
-
-> Objectif : structurer les documents autour du cas d'usage comptable réel.
-> Un document appartient toujours à l'une des trois catégories fixes.
+### ✅ Terminé — v0.2.0
 
 #### Modèle de données
-- [ ] **[V2-1]** Ajout du champ `category` enum (`depense | recette | autre`) sur `documents`
-- [ ] **[V2-2]** Migration Alembic — valeur par défaut `autre` pour les documents existants
-- [ ] **[V2-3]** Mise à jour des schémas Pydantic (`DocumentCreate`, `DocumentUpdate`, `DocumentResponse`)
-- [ ] **[V2-4]** Mise à jour du filtre `list_documents` pour accepter `category`
+- [x] **[V2-1]** Ajout du champ `category` enum (`depense | recette | autre`) sur `documents`
+- [x] **[V2-2]** Migration Alembic — valeur par défaut `autre` pour les documents existants
+- [x] **[V2-3]** Mise à jour des schémas Pydantic (`DocumentCreate`, `DocumentUpdate`, `DocumentResponse`)
+- [x] **[V2-4]** Mise à jour du filtre `list_documents` pour accepter `category`
 
 #### Formulaire d'édition
-- [ ] **[V2-5]** Sélecteur de catégorie en haut du formulaire — 3 boutons radio stylisés (Dépense / Recette / Autre), requis
-- [ ] **[V2-6]** Masquage de la section montants (HT / TVA / TTC) quand `category = autre` via Alpine.js `x-show`
-- [ ] **[V2-7]** Masquage de la date de paiement quand `category = autre`
-- [ ] **[V2-8]** Badge coloré de catégorie dans le header de la page d'édition (rouge = dépense, vert = recette, gris = autre)
+- [x] **[V2-5]** Sélecteur de catégorie en haut du formulaire — 3 boutons radio stylisés (Dépense / Recette / Autre)
+- [x] **[V2-6]** Masquage de la section montants (HT / TVA / TTC) quand `category = autre` via Alpine.js `x-show`
+- [x] **[V2-7]** Masquage de la date de paiement quand `category = autre`
 
 #### Vue année
-- [ ] **[V2-9]** Remplacement du tableau unique par 3 sections distinctes : Dépenses / Recettes / Autres
-- [ ] **[V2-10]** Chaque section n'est affichée que si elle contient au moins un document
-- [ ] **[V2-11]** Chaque section affiche son propre total TTC
-- [ ] **[V2-12]** Header de section avec icône, nombre de documents et total
-- [ ] **[V2-13]** Filtre de catégorie ajouté à la barre de filtres
+- [x] **[V2-9]** Remplacement du tableau unique par 3 sections distinctes : Dépenses / Recettes / Autres
+- [x] **[V2-10]** Chaque section n'est affichée que si elle contient au moins un document
+- [x] **[V2-11]** Chaque section affiche son propre total TTC
+- [x] **[V2-12]** Header de section avec compteur de documents et total TTC
+- [x] **[V2-15b]** Largeurs de colonnes fixes (`<colgroup>` + `table-fixed`) + scroll horizontal
 
 #### Dashboard
-- [ ] **[V2-14]** Remplacement de la stat "Total documents" par deux stats distinctes : total dépenses TTC / total recettes TTC de l'année
-- [ ] **[V2-15]** Indicateur solde net (recettes − dépenses) avec couleur selon positif/négatif
-- [ ] **[V2-16]** Documents récents : badge de catégorie sur chaque ligne
-
-#### Vue `/documents` (filtre transversal)
-- [ ] **[V2-17]** Ajout du filtre par catégorie dans la vue tous les documents
+- [x] **[V2-14]** Stats dépenses TTC / recettes TTC / solde net de l'année
+- [x] **[V2-15]** Indicateur solde net coloré (vert / rouge)
+- [x] **[V2-16]** Documents récents : badge de catégorie sur chaque ligne
 
 ---
 

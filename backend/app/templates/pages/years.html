@@ -25,9 +25,12 @@
             </span>
           </div>
           <div class="mt-3">
-            {% if row.total_ttc %}
-              <p class="text-xs text-slate-500 uppercase tracking-wide">Total TTC</p>
-              <p class="text-lg font-semibold text-slate-800 mt-0.5">{{ "%.2f"|format(row.total_ttc) }} €</p>
+            {% set solde = row.total_recettes - row.total_depenses %}
+            {% if row.total_recettes or row.total_depenses %}
+              <p class="text-xs text-slate-500 uppercase tracking-wide">Solde net TTC</p>
+              <p class="text-lg font-semibold mt-0.5 {{ 'text-green-600' if solde >= 0 else 'text-red-500' }}">
+                {{ "%+.2f"|format(solde) }} €
+              </p>
             {% else %}
               <p class="text-sm text-slate-400 mt-1">Aucun montant renseigné</p>
             {% endif %}
