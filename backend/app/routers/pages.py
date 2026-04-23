@@ -148,6 +148,12 @@ async def year_view(
     search: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> HTMLResponse:
+    exists = await session.scalar(
+        select(func.count(Document.id)).where(extract("year", Document.document_date) == year)
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Aucun document pour cette année")
+
     corr_uuid = _uuid(correspondent_id)
     dtype_uuid = _uuid(document_type_id)
     tag_uuids = [u for s in tag_ids if (u := _uuid(s))]

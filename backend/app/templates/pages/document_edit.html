@@ -68,13 +68,22 @@ function docEditData() {
   <!-- 50/50 split -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-    <!-- PDF viewer -->
-    <div class="bg-slate-900 rounded-xl overflow-hidden aspect-[3/4] lg:sticky lg:top-6">
-      <iframe
-        src="/api/documents/{{ doc.id }}/file"
-        class="w-full h-full border-0"
-        title="{{ doc.title }}"
-      ></iframe>
+    <!-- Viewer -->
+    <div class="rounded-xl overflow-hidden aspect-[3/4] lg:sticky lg:top-6 flex items-center justify-center" style="background-color: #7F7F7F;">
+      {% if doc.mime_type == "application/pdf" %}
+        <iframe
+          src="/api/documents/{{ doc.id }}/file"
+          class="w-full h-full border-0"
+          title="{{ doc.title }}"
+        ></iframe>
+      {% else %}
+        <img
+          src="/api/documents/{{ doc.id }}/file"
+          class="object-contain rounded-lg shadow-2xl"
+          style="max-width: 88%; max-height: 88%;"
+          alt="{{ doc.title }}"
+        >
+      {% endif %}
     </div>
 
     <!-- Edit form -->
@@ -380,6 +389,7 @@ function docEditData() {
         <p class="text-xs text-slate-400">
           Ajouté le {{ doc.created_at.strftime("%d/%m/%Y") if doc.created_at else "—" }}
           · {{ (doc.file_size / 1024) | round(1) }} Ko
+          · {{ {"application/pdf": "PDF", "image/jpeg": "JPEG", "image/png": "PNG"}.get(doc.mime_type, doc.mime_type) }}
         </p>
         <button type="submit"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
