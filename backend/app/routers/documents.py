@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_session
-from app.models.document import Document, document_tags
+from app.models.document import CategoryEnum, Document, document_tags
 from app.models.tag import Tag
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
 from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, save_uploaded_file
@@ -109,6 +109,7 @@ async def upload_document(
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
     year: int | None = None,
+    category: CategoryEnum | None = None,
     correspondent_id: uuid.UUID | None = None,
     document_type_id: uuid.UUID | None = None,
     tag_ids: list[uuid.UUID] = Query(default=[]),
@@ -119,6 +120,8 @@ async def list_documents(
 
     if year:
         stmt = stmt.where(extract("year", Document.document_date) == year)
+    if category:
+        stmt = stmt.where(Document.category == category)
     if correspondent_id:
         stmt = stmt.where(Document.correspondent_id == correspondent_id)
     if document_type_id:

@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.models.document import CategoryEnum
 from app.schemas.correspondent import CorrespondentResponse
 from app.schemas.document_type import DocumentTypeResponse
 from app.schemas.tag import TagResponse
@@ -11,6 +12,7 @@ from app.schemas.tag import TagResponse
 
 class DocumentCreate(BaseModel):
     title: str
+    category: CategoryEnum = CategoryEnum.autre
     document_date: date
     payment_date: date | None = None
     amount_ht: Decimal | None = None
@@ -26,6 +28,7 @@ class DocumentCreate(BaseModel):
 
 class DocumentUpdate(BaseModel):
     title: str | None = None
+    category: CategoryEnum | None = None
     document_date: date | None = None
     payment_date: date | None = None
     amount_ht: Decimal | None = None
@@ -44,6 +47,7 @@ class DocumentResponse(BaseModel):
 
     id: uuid.UUID
     title: str
+    category: CategoryEnum
     file_path: str
     file_hash: str
     mime_type: str

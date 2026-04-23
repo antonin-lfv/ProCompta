@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_session
 from app.models.correspondent import Correspondent
-from app.models.document import Document, document_tags
+from app.models.document import CategoryEnum, Document, document_tags
 from app.models.document_type import DocumentType
 from app.models.tag import Tag
 from app.services.file_service import delete_file
@@ -89,19 +89,24 @@ async def _tags(session: AsyncSession) -> list[Tag]:
 async def dashboard(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
     today = date.today()
 
-    total, year_count, month_count, no_tags_count, no_correspondent_count = [
+    no_tags_count, no_correspondent_count = [
         (await session.scalar(q)) or 0
         for q in [
-            select(func.count(Document.id)),
-            select(func.count(Document.id)).where(extract("year", Document.document_date) == today.year),
-            select(func.count(Document.id)).where(
-                extract("year", Document.document_date) == today.year,
-                extract("month", Document.document_date) == today.month,
-            ),
             select(func.count(Document.id)).where(~Document.id.in_(select(document_tags.c.document_id))),
             select(func.count(Document.id)).where(Document.correspondent_id.is_(None)),
         ]
     ]
+
+    _year_filter = extract("year", Document.document_date) == today.year
+    total_depenses = (await session.scalar(
+        select(func.sum(Document.amount_ttc))
+        .where(_year_filter, Document.category == CategoryEnum.depense)
+    )) or Decimal("0")
+    total_recettes = (await session.scalar(
+        select(func.sum(Document.amount_ttc))
+        .where(_year_filter, Document.category == CategoryEnum.recette)
+    )) or Decimal("0")
+    solde = total_recettes - total_depenses
 
     recent_result = await session.execute(
         select(Document)
@@ -112,9 +117,11 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
 
     return templates.TemplateResponse(request, "pages/dashboard.html", {
         "now": today,
-        "total_documents": total,
-        "year_count": year_count,
-        "month_count": month_count,
+        "current_year": today.year,
+        "total_depenses": total_depenses,
+        "total_recettes": total_recettes,
+        "solde": solde,
+        "solde_color": "green" if solde >= 0 else "red",
         "no_tags_count": no_tags_count,
         "no_correspondent_count": no_correspondent_count,
         "recent_documents": list(recent_result.scalars().all()),
@@ -178,9 +185,21 @@ async def year_view(
 
     docs = list((await session.execute(stmt)).scalars().all())
 
+    docs_depenses = [d for d in docs if d.category == CategoryEnum.depense]
+    docs_recettes = [d for d in docs if d.category == CategoryEnum.recette]
+    docs_autres   = [d for d in docs if d.category == CategoryEnum.autre]
+
+    total_depenses = sum((d.amount_ttc for d in docs_depenses if d.amount_ttc), Decimal("0"))
+    total_recettes = sum((d.amount_ttc for d in docs_recettes if d.amount_ttc), Decimal("0"))
+
     return templates.TemplateResponse(request, "pages/year.html", {
         "year": year,
         "documents": docs,
+        "docs_depenses": docs_depenses,
+        "docs_recettes": docs_recettes,
+        "docs_autres": docs_autres,
+        "total_depenses": total_depenses,
+        "total_recettes": total_recettes,
         "correspondents": await _correspondents(session),
         "doc_types": await _doc_types(session),
         "all_tags": await _tags(session),
@@ -272,11 +291,16 @@ async def document_update_form(
     if doc_date := _date(str(form.get("document_date", ""))):
         doc.document_date = doc_date
 
-    doc.payment_date = _date(str(form.get("payment_date", "")))
-    doc.amount_ht = _decimal(str(form.get("amount_ht", "")))
-    doc.vat_amount = _decimal(str(form.get("vat_amount", "")))
-    doc.vat_rate = _decimal(str(form.get("vat_rate", "")))
-    doc.amount_ttc = _decimal(str(form.get("amount_ttc", "")))
+    cat_val = str(form.get("category", "")).strip()
+    if cat_val in (c.value for c in CategoryEnum):
+        doc.category = CategoryEnum(cat_val)
+
+    is_autre = doc.category == CategoryEnum.autre
+    doc.payment_date = None if is_autre else _date(str(form.get("payment_date", "")))
+    doc.amount_ht = None if is_autre else _decimal(str(form.get("amount_ht", "")))
+    doc.vat_amount = None if is_autre else _decimal(str(form.get("vat_amount", "")))
+    doc.vat_rate = None if is_autre else _decimal(str(form.get("vat_rate", "")))
+    doc.amount_ttc = None if is_autre else _decimal(str(form.get("amount_ttc", "")))
     doc.currency = str(form.get("currency", "EUR")).strip() or "EUR"
     doc.notes = str(form.get("notes", "")).strip() or None
     doc.correspondent_id = _uuid(str(form.get("correspondent_id", "")))

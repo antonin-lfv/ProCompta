@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import enum
 import uuid
 from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, Table, Text, Column
+from sqlalchemy import Date, Enum as SAEnum, ForeignKey, Integer, Numeric, String, Table, Text, Column
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
+
+
+class CategoryEnum(str, enum.Enum):
+    depense = "depense"
+    recette = "recette"
+    autre = "autre"
 
 if TYPE_CHECKING:
     from app.models.correspondent import Correspondent
@@ -27,6 +34,13 @@ document_tags = Table(
 
 class Document(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "documents"
+
+    category: Mapped[CategoryEnum] = mapped_column(
+        SAEnum(CategoryEnum, name="categoryenum"),
+        nullable=False,
+        default=CategoryEnum.autre,
+        server_default="autre",
+    )
 
     title: Mapped[str] = mapped_column(nullable=False)
     file_path: Mapped[str] = mapped_column(nullable=False)
