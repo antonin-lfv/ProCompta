@@ -1,6 +1,7 @@
 import uuid
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -220,22 +221,37 @@ async def documents_list(
     stmt = stmt.order_by(Document.document_date.desc(), Document.created_at.desc())
     docs = list((await session.execute(stmt)).scalars().all())
 
+    if no_tags:
+        back_url = "/documents?no_tags=1"
+    elif no_correspondent:
+        back_url = "/documents?no_correspondent=1"
+    else:
+        back_url = "/documents"
+
     return templates.TemplateResponse(request, "pages/documents.html", {
         "documents": docs,
         "no_tags": no_tags,
         "no_correspondent": no_correspondent,
         "search": search or "",
+        "back_url_encoded": quote(back_url, safe=""),
     })
 
 
 # ── Édition document ──────────────────────────────────────────────────────────
 
 @router.get("/documents/{id}/edit", response_class=HTMLResponse)
-async def document_edit(id: uuid.UUID, request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
+async def document_edit(
+    id: uuid.UUID,
+    request: Request,
+    back: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> HTMLResponse:
     doc = await _doc_or_404(session, id)
+    back_url = back if back and back.startswith("/") else f"/year/{doc.document_date.year}"
     all_tags_list = await _tags(session)
     return templates.TemplateResponse(request, "pages/document_edit.html", {
         "doc": doc,
+        "back_url": back_url,
         "correspondents": await _correspondents(session),
         "doc_types": await _doc_types(session),
         "all_tags": all_tags_list,
