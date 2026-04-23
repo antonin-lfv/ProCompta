@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import badge %}
+
+{% block title %}{{ doc.title }}{% endblock %}
+
+{% block head %}
+<script>
+function docEditData() {
+  return {
+    selected: {{ doc_tags_json | tojson }},
+    all: {{ all_tags_json | tojson }},
+    query: '',
+    open: false,
+    get filtered() {
+      const sel = new Set(this.selected.map(t => t.id));
+      return this.all.filter(t =>
+        !sel.has(t.id) &&
+        t.name.toLowerCase().includes(this.query.toLowerCase())
+      );
+    },
+    add(tag) { this.selected.push(tag); this.query = ''; this.open = false; },
+    remove(id) { this.selected = this.selected.filter(t => t.id !== id); },
+    async createTag() {
+      const name = this.query.trim();
+      if (!name) return;
+      const resp = await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (resp.ok) {
+        const tag = await resp.json();
+        this.all.push({ id: tag.id, name: tag.name, color: tag.color });
+        this.add({ id: tag.id, name: tag.name, color: tag.color });
+      }
+    }
+  };
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3 min-w-0">
+      <a href="/year/{{ doc.document_date.year }}"
+         class="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+      </a>
+      <h1 class="text-xl font-bold text-slate-900 truncate">{{ doc.title }}</h1>
+    </div>
+    <form method="POST" action="/documents/{{ doc.id }}/delete"
+          onsubmit="return confirm('Supprimer définitivement ce document ?')">
+      <button type="submit"
+              class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 rounded-lg border border-red-200 hover:bg-red-50 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+        </svg>
+        Supprimer
+      </button>
+    </form>
+  </div>
+
+  <!-- 50/50 split -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+    <!-- PDF viewer -->
+    <div class="bg-slate-900 rounded-xl overflow-hidden aspect-[3/4] lg:sticky lg:top-6">
+      <iframe
+        src="/api/documents/{{ doc.id }}/file"
+        class="w-full h-full border-0"
+        title="{{ doc.title }}"
+      ></iframe>
+    </div>
+
+    <!-- Edit form -->
+    <form method="POST" action="/documents/{{ doc.id }}/edit"
+          class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100"
+          x-data="docEditData()">
+
+      <!-- Section: Identification -->
+      <div class="px-5 py-4 space-y-4">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Identification</h2>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Titre</label>
+          <input type="text" name="title" value="{{ doc.title }}" required
+                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Date du document</label>
+            <input type="date" name="document_date"
+                   value="{{ doc.document_date.isoformat() if doc.document_date else '' }}"
+                   class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          {% set pay_val = doc.payment_date.isoformat() if doc.payment_date else "" %}
+          <div x-data="{ payDate: '{{ pay_val }}' }">
+            <label class="block text-sm font-medium text-slate-700 mb-1">Date de paiement</label>
+            <input type="hidden" name="payment_date" :value="payDate">
+            <div class="flex gap-1">
+              <template x-if="payDate">
+                <input type="date"
+                       :value="payDate"
+                       @change="payDate = $event.target.value"
+                       class="flex-1 text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              </template>
+              <template x-if="!payDate">
+                <button type="button"
+                        @click="payDate = new Date().toISOString().slice(0,10)"
+                        class="flex-1 text-left text-sm text-slate-400 rounded-lg border border-dashed border-slate-200 px-3 py-2 hover:border-indigo-300 hover:text-indigo-500 transition-colors">
+                  + Ajouter une date de paiement
+                </button>
+              </template>
+              <button type="button" @click="payDate = ''"
+                      x-show="payDate" x-cloak
+                      title="Effacer"
+                      class="px-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Correspondant avec création rapide -->
+        <div x-data="{
+          adding: false,
+          newName: '',
+          loading: false,
+          async create() {
+            const name = this.newName.trim();
+            if (!name) return;
+            this.loading = true;
+            const resp = await fetch('/api/correspondents', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ name })
+            });
+            if (resp.ok) {
+              const c = await resp.json();
+              const opt = new Option(c.name, c.id, true, true);
+              this.$refs.sel.add(opt);
+            }
+            this.adding = false;
+            this.newName = '';
+            this.loading = false;
+          }
+        }">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Correspondant</label>
+          <div class="flex gap-1">
+            <select name="correspondent_id" x-ref="sel"
+                    class="flex-1 h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option value=""></option>
+              {% for c in correspondents %}
+                <option value="{{ c.id }}" {{ "selected" if doc.correspondent_id == c.id else "" }}>{{ c.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" @click="adding = !adding"
+                    class="h-10 px-2.5 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
+                    title="Créer un correspondant">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
+          </div>
+          <div x-show="adding" x-cloak class="mt-1.5 flex gap-1">
+            <input type="text" x-model="newName" placeholder="Nom du correspondant…"
+                   @keydown.enter.prevent="create()"
+                   @keydown.escape="adding = false"
+                   x-effect="if(adding) $nextTick(() => $el.focus())"
+                   class="flex-1 text-sm rounded-lg border border-indigo-300 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <button type="button" @click="create()" :disabled="loading"
+                    class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              Créer
+            </button>
+            <button type="button" @click="adding = false"
+                    class="px-2 text-slate-400 hover:text-slate-600 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Type de document avec création rapide -->
+        <div x-data="{
+          adding: false,
+          newName: '',
+          newColor: '#6366f1',
+          loading: false,
+          async create() {
+            const name = this.newName.trim();
+            if (!name) return;
+            this.loading = true;
+            const resp = await fetch('/api/document-types', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ name, color: this.newColor })
+            });
+            if (resp.ok) {
+              const dt = await resp.json();
+              const opt = new Option(dt.name, dt.id, true, true);
+              this.$refs.sel.add(opt);
+            }
+            this.adding = false;
+            this.newName = '';
+            this.loading = false;
+          }
+        }">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Type de document</label>
+          <div class="flex gap-1">
+            <select name="document_type_id" x-ref="sel"
+                    class="flex-1 h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option value=""></option>
+              {% for dt in doc_types %}
+                <option value="{{ dt.id }}" {{ "selected" if doc.document_type_id == dt.id else "" }}>{{ dt.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="button" @click="adding = !adding"
+                    class="h-10 px-2.5 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
+                    title="Créer un type">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
+          </div>
+          <div x-show="adding" x-cloak class="mt-1.5 flex gap-1">
+            <input type="text" x-model="newName" placeholder="Nom du type…"
+                   @keydown.enter.prevent="create()"
+                   @keydown.escape="adding = false"
+                   x-effect="if(adding) $nextTick(() => $el.focus())"
+                   class="flex-1 text-sm rounded-lg border border-indigo-300 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <input type="color" x-model="newColor"
+                   class="w-9 h-9 rounded-lg border border-slate-200 cursor-pointer p-0.5 bg-white shrink-0">
+            <button type="button" @click="create()" :disabled="loading"
+                    class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              Créer
+            </button>
+            <button type="button" @click="adding = false"
+                    class="px-2 text-slate-400 hover:text-slate-600 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Montants -->
+      <div class="px-5 py-4 space-y-4">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Montants</h2>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Montant HT</label>
+            <input type="text" name="amount_ht" inputmode="decimal"
+                   value="{{ doc.amount_ht if doc.amount_ht is not none else '' }}"
+                   placeholder="0.00"
+                   class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Taux TVA (%)</label>
+            <input type="text" name="vat_rate" inputmode="decimal"
+                   value="{{ doc.vat_rate if doc.vat_rate is not none else '' }}"
+                   placeholder="20.00"
+                   class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Montant TVA</label>
+            <input type="text" name="vat_amount" inputmode="decimal"
+                   value="{{ doc.vat_amount if doc.vat_amount is not none else '' }}"
+                   placeholder="0.00"
+                   class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Montant TTC</label>
+            <input type="text" name="amount_ttc" inputmode="decimal"
+                   value="{{ doc.amount_ttc if doc.amount_ttc is not none else '' }}"
+                   placeholder="0.00"
+                   class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+        </div>
+
+        <div class="max-w-[120px]">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Devise</label>
+          <input type="text" name="currency"
+                 value="{{ doc.currency or 'EUR' }}"
+                 maxlength="3"
+                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 uppercase">
+        </div>
+      </div>
+
+      <!-- Section: Tags -->
+      <div class="px-5 py-4 space-y-3">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tags</h2>
+
+        <!-- Hidden inputs for form submission -->
+        <template x-for="tag in selected" :key="tag.id">
+          <input type="hidden" name="tag_ids" :value="tag.id">
+        </template>
+
+        <!-- Selected chips -->
+        <div class="flex flex-wrap gap-1.5 min-h-[28px]">
+          <template x-for="tag in selected" :key="tag.id">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium"
+                  :style="{ backgroundColor: tag.color + '1a', color: tag.color }">
+              <span x-text="tag.name"></span>
+              <button type="button" @click="remove(tag.id)"
+                      class="hover:opacity-70 transition-opacity leading-none">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" fill="currentColor" class="w-3 h-3">
+                  <path d="M4.293 4.293a1 1 0 0 1 1.414 0L7 5.586l1.293-1.293a1 1 0 1 1 1.414 1.414L8.414 7l1.293 1.293a1 1 0 0 1-1.414 1.414L7 8.414l-1.293 1.293a1 1 0 0 1-1.414-1.414L5.586 7 4.293 5.707a1 1 0 0 1 0-1.414Z"/>
+                </svg>
+              </button>
+            </span>
+          </template>
+          <span x-show="selected.length === 0" class="text-sm text-slate-400">Aucun tag sélectionné</span>
+        </div>
+
+        <!-- Tag search + dropdown -->
+        <div class="relative" @click.outside="open = false">
+          <input
+            type="text"
+            x-model="query"
+            @focus="open = true"
+            @input="open = true"
+            @keydown.escape="open = false"
+            @keydown.enter.prevent="filtered.length === 1 ? add(filtered[0]) : (filtered.length === 0 && query ? createTag() : null)"
+            placeholder="Rechercher ou créer un tag…"
+            class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+          <div
+            x-show="open && (filtered.length > 0 || query.trim().length > 0)"
+            x-cloak
+            class="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+          >
+            <template x-for="tag in filtered" :key="tag.id">
+              <button
+                type="button"
+                @click="add(tag)"
+                class="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
+              >
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: tag.color }"></span>
+                <span x-text="tag.name" class="text-slate-800"></span>
+              </button>
+            </template>
+            <button
+              type="button"
+              @click="createTag()"
+              x-show="filtered.length === 0 && query.trim().length > 0"
+              class="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-indigo-600 hover:bg-indigo-50 transition-colors border-t border-slate-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Créer le tag <span class="font-semibold ml-0.5" x-text="'« ' + query.trim() + ' »'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Notes -->
+      <div class="px-5 py-4 space-y-3">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Notes</h2>
+        <textarea name="notes" rows="3" placeholder="Remarques, références…"
+                  class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none">{{ doc.notes or "" }}</textarea>
+      </div>
+
+      <!-- Actions -->
+      <div class="px-5 py-4 flex items-center justify-between bg-slate-50/50">
+        <p class="text-xs text-slate-400">
+          Ajouté le {{ doc.created_at.strftime("%d/%m/%Y") if doc.created_at else "—" }}
+          · {{ (doc.file_size / 1024) | round(1) }} Ko
+        </p>
+        <button type="submit"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          Enregistrer
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+{% endblock %}

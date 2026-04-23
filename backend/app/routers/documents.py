@@ -1,5 +1,6 @@
+import subprocess
 import uuid
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -17,6 +18,21 @@ from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, save_uplo
 from app.services.preview_service import delete_preview, generate_preview
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+def _extract_pdf_date(file_path: str) -> date | None:
+    try:
+        result = subprocess.run(
+            ["pdfinfo", "-isodates", file_path],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            if line.startswith(("CreationDate:", "ModDate:")):
+                val = line.split(":", 1)[1].strip()
+                return datetime.fromisoformat(val).date()
+    except Exception:
+        pass
+    return None
 
 _with_relations = [
     selectinload(Document.tags),
@@ -45,13 +61,19 @@ async def list_years(session: AsyncSession = Depends(get_session)) -> list[int]:
     return [int(row.year) for row in result.all()]
 
 
+@router.get("/upload")
+async def upload_get_not_allowed() -> None:
+    raise HTTPException(status_code=405, detail="Use POST /upload to upload a file")
+
+
 @router.post("/upload", response_model=DocumentResponse, status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
 ) -> Document:
-    if file.content_type not in ALLOWED_MIME_TYPES:
-        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+    mime = file.content_type or ""
+    if mime not in ALLOWED_MIME_TYPES:
+        raise HTTPException(status_code=400, detail="Seuls les PDF et images (JPG, PNG) sont acceptés")
 
     document_id = uuid.uuid4()
     file_path, file_hash, file_size = await save_uploaded_file(file, document_id)
@@ -61,11 +83,13 @@ async def upload_document(
         delete_file(file_path)
         raise HTTPException(status_code=409, detail="This file already exists", headers={"X-Duplicate-Id": str(duplicate.id)})
 
+    full_path = str(Path(settings.storage_path) / file_path)
+    pdf_date = _extract_pdf_date(full_path) if mime == "application/pdf" else None
+
     try:
-        pdf_full_path = str(Path(settings.storage_path) / file_path)
-        await generate_preview(pdf_full_path, document_id)
+        await generate_preview(full_path, document_id, mime)
     except Exception:
-        pass  # preview failure is non-blocking
+        pass
 
     stem = Path(file.filename or "document").stem
     doc = Document(
@@ -73,9 +97,9 @@ async def upload_document(
         title=stem,
         file_path=file_path,
         file_hash=file_hash,
-        mime_type=file.content_type or "application/pdf",
+        mime_type=mime,
         file_size=file_size,
-        document_date=date.today(),
+        document_date=pdf_date or date.today(),
     )
     session.add(doc)
     await session.commit()
@@ -144,6 +168,22 @@ async def update_document(
         raise HTTPException(status_code=409, detail="Invalid correspondent or document type")
 
     return await _get_doc_or_404(session, id)
+
+
+@router.get("/{id}/file")
+async def get_document_file(id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    from fastapi.responses import FileResponse
+    doc = await session.get(Document, id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    path = Path(settings.storage_path) / doc.file_path
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
+    return FileResponse(
+        path,
+        media_type=doc.mime_type,
+        headers={"Content-Disposition": f'inline; filename="{path.name}"'},
+    )
 
 
 @router.delete("/{id}", status_code=204)

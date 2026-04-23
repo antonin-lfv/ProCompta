@@ -7,16 +7,22 @@ from fastapi import UploadFile
 
 from app.config import settings
 
-ALLOWED_MIME_TYPES = {"application/pdf"}
+ALLOWED_MIME_TYPES = {"application/pdf", "image/jpeg", "image/png"}
+
+_MIME_EXT = {
+    "application/pdf": ".pdf",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+}
 
 
 async def save_uploaded_file(file: UploadFile, document_id: uuid.UUID) -> tuple[str, str, int]:
-    """Read, hash and persist an uploaded file. Returns (relative_path, sha256, size)."""
     content = await file.read()
     file_hash = hashlib.sha256(content).hexdigest()
     file_size = len(content)
 
-    relative_path = f"documents/{document_id}.pdf"
+    ext = _MIME_EXT.get(file.content_type or "", ".bin")
+    relative_path = f"documents/{document_id}{ext}"
     full_path = Path(settings.storage_path) / relative_path
     full_path.parent.mkdir(parents=True, exist_ok=True)
 

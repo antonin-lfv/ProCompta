@@ -7,7 +7,7 @@
 ## Kanban
 
 ### 🔄 En cours
-_(rien — Phase 4 terminée, en attente de validation avant Phase 5)_
+_(rien — Phase 5 terminée, en attente de validation avant Phase 6)_
 
 ### ✅ Terminé
 
@@ -48,13 +48,13 @@ _(rien — Phase 4 terminée, en attente de validation avant Phase 5)_
 - [x] **[P4-5]** `app/templating.py` — singleton Jinja2 + globals (current_year, app_version)
 - [x] **[P4-6]** `routers/pages.py` + dashboard `/` avec stats DB
 
-#### Phase 5 — Pages frontend
-- [ ] **[P5-1]** Dashboard `/` — stats + derniers documents
-- [ ] **[P5-2]** Vue année `/year/{year}` — grille cards + filtres
-- [ ] **[P5-3]** Upload drag-and-drop sur la vue année (HTMX)
-- [ ] **[P5-4]** Vue édition `/documents/{id}/edit` — split 50/50
-- [ ] **[P5-5]** Liste des années `/years`
-- [ ] **[P5-6]** Configuration `/config` — onglets Correspondants / Types / Tags
+#### Phase 5 — Pages frontend ✅
+- [x] **[P5-1]** Dashboard `/` — stats + derniers documents
+- [x] **[P5-2]** Vue année `/year/{year}` — tableau + filtres + totaux
+- [x] **[P5-3]** Upload drag-and-drop sur la vue année (Alpine.js + fetch → redirect edit)
+- [x] **[P5-4]** Vue édition `/documents/{id}/edit` — split 50/50 + tag multi-select Alpine.js
+- [x] **[P5-5]** Liste des années `/years`
+- [x] **[P5-6]** Configuration `/config` — onglets Alpine.js + CRUD (HTMX delete)
 
 #### Phase 6 — Polish MVP
 - [ ] **[P6-1]** Gestion des erreurs (404, doublons, fichier invalide)

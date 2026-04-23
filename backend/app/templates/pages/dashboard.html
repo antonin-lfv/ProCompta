@@ -66,7 +66,8 @@
           </thead>
           <tbody class="divide-y divide-slate-100">
             {% for doc in recent_documents %}
-            <tr class="hover:bg-slate-50 transition-colors group">
+            <tr class="hover:bg-slate-50 transition-colors group cursor-pointer"
+                @click="if(!$event.target.closest('button, a')) window.location.href='/documents/{{ doc.id }}/edit'">
               <td class="px-4 py-3">
                 <a href="/documents/{{ doc.id }}/edit" class="font-medium text-slate-800 hover:text-indigo-600 transition-colors">
                   {{ doc.title }}

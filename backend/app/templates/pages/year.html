@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import badge, empty_state %}
+
+{% block title %}{{ year }}{% endblock %}
+
+{% block head %}
+<script>
+function yearData() {
+  return {
+    showFilters: {{ 'true' if has_filters else 'false' }},
+    dragOver: false,
+    uploading: false,
+    uploadError: '',
+    dupId: '',
+    async handleDrop(e) {
+      this.dragOver = false;
+      const file = e.dataTransfer?.files?.[0];
+      if (file) await this.upload(file);
+    },
+    async handleFile(e) {
+      const file = e.target.files[0];
+      if (file) await this.upload(file);
+      e.target.value = '';
+    },
+    async upload(file) {
+      if (this.uploading) return;
+      this.uploading = true;
+      this.uploadError = '';
+      this.dupId = '';
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+        if (resp.status === 201) {
+          const doc = await resp.json();
+          window.location.href = '/documents/' + doc.id + '/edit';
+        } else if (resp.status === 409) {
+          this.dupId = resp.headers.get('X-Duplicate-Id') || '';
+          this.uploadError = 'Ce fichier existe déjà dans la base.';
+          this.uploading = false;
+        } else {
+          const body = await resp.text();
+          console.error('Upload error', resp.status, body);
+          this.uploadError = 'Erreur lors de l\'import (' + resp.status + ').';
+          this.uploading = false;
+        }
+      } catch(err) {
+        console.error('Upload fetch error', err);
+        this.uploadError = 'Impossible de joindre le serveur.';
+        this.uploading = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div
+  class="max-w-7xl mx-auto space-y-6"
+  x-data="yearData()"
+  @dragover.window.prevent="if(!uploading) dragOver = true"
+  @dragleave.window="if(!$event.relatedTarget) dragOver = false"
+  @drop.window.prevent="dragOver = false; handleDrop($event)"
+>
+
+  <!-- Drag-and-drop overlay (visuel uniquement, événements gérés au niveau window) -->
+  <div
+    class="fixed inset-0 z-50 bg-indigo-900/20 backdrop-blur-sm flex items-center justify-center pointer-events-none"
+    x-show="dragOver"
+    x-cloak
+  >
+    <div class="bg-white rounded-2xl border-2 border-dashed border-indigo-400 px-16 py-12 text-center shadow-xl">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+           class="w-12 h-12 mx-auto text-indigo-400 mb-3">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+      </svg>
+      <p class="text-lg font-semibold text-indigo-700">Déposez votre PDF ici</p>
+      <p class="text-sm text-slate-500 mt-1">Le fichier sera importé automatiquement</p>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">{{ year }}</h1>
+      <p class="text-sm text-slate-500 mt-0.5">
+        {{ documents|length }} document{{ "s" if documents|length != 1 else "" }}
+        {% set ns = namespace(total=0) %}
+        {% for doc in documents %}{% if doc.amount_ttc %}{% set ns.total = ns.total + doc.amount_ttc %}{% endif %}{% endfor %}
+        {% if ns.total %} · {{ "%.2f"|format(ns.total) }} € TTC{% endif %}
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        @click="showFilters = !showFilters"
+        :class="showFilters ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+        class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+        </svg>
+        Filtres
+        {% if has_filters %}<span class="w-1.5 h-1.5 rounded-full bg-indigo-500 ml-0.5"></span>{% endif %}
+      </button>
+      <label class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white cursor-pointer hover:bg-indigo-700 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Importer
+        <input type="file" accept="application/pdf,image/jpeg,image/png" class="hidden" @change="handleFile($event)">
+      </label>
+    </div>
+  </div>
+
+  <!-- Upload status -->
+  <div x-show="uploading || uploadError" x-cloak>
+    <template x-if="uploading">
+      <div class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 text-indigo-700">
+        <svg class="w-5 h-5 animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <span class="text-sm font-medium">Import en cours, redirection vers l'édition…</span>
+      </div>
+    </template>
+    <template x-if="!uploading && uploadError">
+      <div class="flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+        <div class="flex items-center gap-3 text-red-700">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 shrink-0">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          <span class="text-sm font-medium" x-text="uploadError"></span>
+          <template x-if="dupId">
+            <a :href="'/documents/' + dupId + '/edit'" class="text-sm text-red-800 underline hover:text-red-900 font-semibold">
+              Voir le document existant →
+            </a>
+          </template>
+        </div>
+        <button @click="uploadError = ''; dupId = ''" class="text-red-400 hover:text-red-600 transition-colors ml-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </template>
+  </div>
+
+  <!-- Filters -->
+  <div x-show="showFilters" x-cloak
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0 -translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100 translate-y-0"
+       x-transition:leave-end="opacity-0 -translate-y-2">
+    <form method="GET" action="/year/{{ year }}"
+          class="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Correspondant</label>
+        <select name="correspondent_id"
+                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <option value="">Tous</option>
+          {% for c in correspondents %}
+            <option value="{{ c.id }}" {{ "selected" if filters.correspondent_id == c.id|string else "" }}>
+              {{ c.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Type de document</label>
+        <select name="document_type_id"
+                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <option value="">Tous</option>
+          {% for dt in doc_types %}
+            <option value="{{ dt.id }}" {{ "selected" if filters.document_type_id == dt.id|string else "" }}>
+              {{ dt.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Recherche titre</label>
+        <input type="text" name="search" value="{{ filters.search }}" placeholder="Facture EDF…"
+               class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div class="flex items-end gap-2">
+        <button type="submit"
+                class="flex-1 h-10 px-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+          Filtrer
+        </button>
+        {% if has_filters %}
+          <a href="/year/{{ year }}"
+             class="h-10 px-3 flex items-center bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors whitespace-nowrap">
+            Réinitialiser
+          </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Document table -->
+  <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    {% if documents %}
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-200 bg-slate-50/50">
+            <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Titre</th>
+            <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Date</th>
+            <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Correspondant</th>
+            <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Type</th>
+            <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Tags</th>
+            <th class="text-right text-xs font-semibold text-slate-500 px-4 py-3">Montant TTC</th>
+            <th class="w-16"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for doc in documents %}
+          <tr class="hover:bg-slate-50 transition-colors group cursor-pointer" id="doc-{{ doc.id }}"
+              @click="if(!$event.target.closest('button, a')) window.location.href='/documents/{{ doc.id }}/edit'">
+            <td class="px-4 py-3 max-w-xs">
+              <a href="/documents/{{ doc.id }}/edit"
+                 class="font-medium text-slate-800 hover:text-indigo-600 transition-colors line-clamp-1 block">
+                {{ doc.title }}
+              </a>
+            </td>
+            <td class="px-4 py-3 text-slate-500 whitespace-nowrap">
+              {{ doc.document_date.strftime("%d/%m/%Y") }}
+            </td>
+            <td class="px-4 py-3 text-slate-500 whitespace-nowrap">
+              {{ doc.correspondent.name if doc.correspondent else "—" }}
+            </td>
+            <td class="px-4 py-3">
+              {% if doc.document_type %}
+                {{ badge(doc.document_type.name, doc.document_type.color) }}
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                {% for tag in doc.tags %}
+                  {{ badge(tag.name, tag.color) }}
+                {% else %}
+                  <span class="text-slate-400">—</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="px-4 py-3 text-right font-medium text-slate-700 whitespace-nowrap">
+              {% if doc.amount_ttc %}
+                {{ "%.2f"|format(doc.amount_ttc) }} {{ doc.currency }}
+              {% else %}
+                <span class="text-slate-400">—</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex items-center justify-end gap-1">
+                <a href="/documents/{{ doc.id }}/edit"
+                   class="p-1.5 rounded-md text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                   title="Modifier">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                  </svg>
+                </a>
+                <button
+                  hx-delete="/api/documents/{{ doc.id }}"
+                  hx-confirm="Supprimer définitivement ce document ?"
+                  hx-on::after-request="if(event.detail.successful) document.getElementById('doc-{{ doc.id }}').remove()"
+                  class="p-1.5 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                  title="Supprimer">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      {{ empty_state("Aucun document pour cette période. Glissez un PDF ici ou cliquez sur « Importer ».") }}
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
