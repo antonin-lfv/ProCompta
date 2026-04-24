@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import extract, func, select
+from sqlalchemy import case, extract, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -83,6 +83,13 @@ async def _tags(session: AsyncSession) -> list[Tag]:
     return list(r.scalars().all())
 
 
+# Montant EUR effectif : amount_ttc si EUR, sinon amount_ttc_eur
+_eur_amount = case(
+    (Document.currency == "EUR", Document.amount_ttc),
+    else_=Document.amount_ttc_eur,
+)
+
+
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
@@ -99,11 +106,11 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
 
     _year_filter = extract("year", Document.document_date) == today.year
     total_depenses = (await session.scalar(
-        select(func.sum(Document.amount_ttc))
+        select(func.sum(_eur_amount))
         .where(_year_filter, Document.category == CategoryEnum.depense)
     )) or Decimal("0")
     total_recettes = (await session.scalar(
-        select(func.sum(Document.amount_ttc))
+        select(func.sum(_eur_amount))
         .where(_year_filter, Document.category == CategoryEnum.recette)
     )) or Decimal("0")
     solde = total_recettes - total_depenses
@@ -137,11 +144,11 @@ async def years_list(request: Request, session: AsyncSession = Depends(get_sessi
             extract("year", Document.document_date).label("year"),
             func.count(Document.id).label("count"),
             func.coalesce(
-                func.sum(Document.amount_ttc).filter(Document.category == CategoryEnum.recette),
+                func.sum(_eur_amount).filter(Document.category == CategoryEnum.recette),
                 0,
             ).label("total_recettes"),
             func.coalesce(
-                func.sum(Document.amount_ttc).filter(Document.category == CategoryEnum.depense),
+                func.sum(_eur_amount).filter(Document.category == CategoryEnum.depense),
                 0,
             ).label("total_depenses"),
         )
@@ -190,8 +197,14 @@ async def year_view(
     docs_recettes = [d for d in docs if d.category == CategoryEnum.recette]
     docs_autres   = [d for d in docs if d.category == CategoryEnum.autre]
 
-    total_depenses = sum((d.amount_ttc for d in docs_depenses if d.amount_ttc), Decimal("0"))
-    total_recettes = sum((d.amount_ttc for d in docs_recettes if d.amount_ttc), Decimal("0"))
+    def _eur(d: Document) -> Decimal:
+        return (d.amount_ttc if d.currency == "EUR" else d.amount_ttc_eur) or Decimal("0")
+
+    total_depenses = sum((_eur(d) for d in docs_depenses), Decimal("0"))
+    total_recettes = sum((_eur(d) for d in docs_recettes), Decimal("0"))
+    has_foreign_currency = any(
+        d.currency != "EUR" and not d.amount_ttc_eur for d in docs
+    )
 
     return templates.TemplateResponse(request, "pages/year.html", {
         "year": year,
@@ -201,6 +214,7 @@ async def year_view(
         "docs_autres": docs_autres,
         "total_depenses": total_depenses,
         "total_recettes": total_recettes,
+        "has_foreign_currency": has_foreign_currency,
         "correspondents": await _correspondents(session),
         "doc_types": await _doc_types(session),
         "all_tags": await _tags(session),
@@ -302,6 +316,7 @@ async def document_update_form(
     doc.vat_amount = None if is_autre else _decimal(str(form.get("vat_amount", "")))
     doc.vat_rate = None if is_autre else _decimal(str(form.get("vat_rate", "")))
     doc.amount_ttc = None if is_autre else _decimal(str(form.get("amount_ttc", "")))
+    doc.amount_ttc_eur = None if is_autre else _decimal(str(form.get("amount_ttc_eur", "")))
     doc.currency = str(form.get("currency", "EUR")).strip() or "EUR"
     doc.notes = str(form.get("notes", "")).strip() or None
     doc.correspondent_id = _uuid(str(form.get("correspondent_id", "")))

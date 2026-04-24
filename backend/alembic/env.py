@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.config import settings
-from app.models import Base  # noqa: F401 — importe tous les modèles pour autogenerate
+from app.models import Base  # noqa: F401 - importe tous les modèles pour autogenerate
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

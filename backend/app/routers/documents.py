@@ -1,8 +1,10 @@
 import subprocess
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import extract, select
 from sqlalchemy.exc import IntegrityError
@@ -13,7 +15,14 @@ from app.config import settings
 from app.database import get_session
 from app.models.document import CategoryEnum, Document, document_tags
 from app.models.tag import Tag
+from pydantic import BaseModel
+
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
+
+
+class ConvertRequest(BaseModel):
+    currency: str
+    amount: Decimal
 from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, save_uploaded_file
 from app.services.preview_service import delete_preview, generate_preview
 
@@ -187,6 +196,52 @@ async def get_document_file(id: uuid.UUID, session: AsyncSession = Depends(get_s
         media_type=doc.mime_type,
         headers={"Content-Disposition": f'inline; filename="{path.name}"'},
     )
+
+
+@router.post("/{id}/convert-currency")
+async def convert_currency(
+    id: uuid.UUID,
+    body: ConvertRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if body.currency == "EUR":
+        return {"amount_eur": str(body.amount)}
+
+    doc = await session.get(Document, id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    today = date.today()
+    rate_date = min(doc.payment_date or doc.document_date, today)
+
+    async def _ecb_rate(start: str, end: str) -> Decimal | None:
+        url = (
+            f"https://data-api.ecb.europa.eu/service/data/"
+            f"EXR/D.{body.currency}.EUR.SP00.A"
+            f"?startPeriod={start}&endPeriod={end}&format=jsondata"
+        )
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            obs = resp.json()["dataSets"][0]["series"]["0:0:0:0:0"]["observations"]
+            if not obs:
+                return None
+            return Decimal(str(obs[str(max(int(k) for k in obs))][0]))
+
+    try:
+        rate = await _ecb_rate(
+            (rate_date - timedelta(days=10)).isoformat(),
+            rate_date.isoformat(),
+        ) or await _ecb_rate(
+            (today - timedelta(days=30)).isoformat(),
+            today.isoformat(),
+        )
+        if rate is None:
+            raise ValueError("No ECB rate available")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Currency conversion failed: {e}")
+
+    return {"amount_eur": str((body.amount / rate).quantize(Decimal("0.01")))}
 
 
 @router.delete("/{id}", status_code=204)

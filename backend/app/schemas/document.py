@@ -19,6 +19,7 @@ class DocumentCreate(BaseModel):
     vat_amount: Decimal | None = None
     vat_rate: Decimal = Decimal("0.00")
     amount_ttc: Decimal | None = None
+    amount_ttc_eur: Decimal | None = None
     currency: str = "EUR"
     notes: str | None = None
     correspondent_id: uuid.UUID | None = None
@@ -35,6 +36,7 @@ class DocumentUpdate(BaseModel):
     vat_amount: Decimal | None = None
     vat_rate: Decimal | None = None
     amount_ttc: Decimal | None = None
+    amount_ttc_eur: Decimal | None = None
     currency: str | None = None
     notes: str | None = None
     correspondent_id: uuid.UUID | None = None
@@ -58,6 +60,7 @@ class DocumentResponse(BaseModel):
     vat_amount: Decimal | None
     vat_rate: Decimal | None
     amount_ttc: Decimal | None
+    amount_ttc_eur: Decimal | None
     currency: str
     notes: str | None
     correspondent_id: uuid.UUID | None

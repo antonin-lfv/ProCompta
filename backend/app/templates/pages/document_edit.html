@@ -9,20 +9,47 @@ function docEditData() {
   return {
     category: '{{ doc.category.value }}',
     payDate: '{{ doc.payment_date.isoformat() if doc.payment_date else "" }}',
+    currency: '{{ doc.currency or "EUR" }}',
+    amountEur: '{{ doc.amount_ttc_eur if doc.amount_ttc_eur is not none else "" }}',
+    fetchingRate: false,
     selected: {{ doc_tags_json | tojson }},
     all: {{ all_tags_json | tojson }},
     query: '',
     open: false,
     init() {
+      this.$watch('currency', (val) => {
+        this.amountEur = '';
+        if (val !== 'EUR') this.fetchConversion();
+      });
       this.$watch('category', (val) => {
         if (val === 'autre') {
           this.payDate = '';
+          this.amountEur = '';
           ['amount_ht', 'vat_rate', 'vat_amount', 'amount_ttc'].forEach(name => {
             const el = this.$root.querySelector(`[name="${name}"]`);
             if (el) el.value = '';
           });
         }
       });
+    },
+    async fetchConversion() {
+      const raw = this.$root.querySelector('[name="amount_ttc"]')?.value?.trim();
+      const amount = parseFloat(raw?.replace(',', '.'));
+      if (!amount || this.currency === 'EUR') return;
+      this.fetchingRate = true;
+      try {
+        const resp = await fetch('/api/documents/{{ doc.id }}/convert-currency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currency: this.currency, amount }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          this.amountEur = data.amount_eur;
+        }
+      } finally {
+        this.fetchingRate = false;
+      }
     },
     get filtered() {
       const sel = new Set(this.selected.map(t => t.id));
@@ -53,7 +80,7 @@ function docEditData() {
 {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto" x-data="docEditData()">
 
   <!-- Header -->
   <div class="flex items-center justify-between mb-6">
@@ -138,8 +165,7 @@ function docEditData() {
 
     <!-- Edit form -->
     <form method="POST" action="/documents/{{ doc.id }}/edit"
-          class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100"
-          x-data="docEditData()">
+          class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
       <input type="hidden" name="back" value="{{ back_url }}">
 
       <!-- Section: Catégorie -->
@@ -378,12 +404,38 @@ function docEditData() {
           </div>
         </div>
 
-        <div class="max-w-[120px]">
+        <div class="w-[120px]">
           <label class="block text-sm font-medium text-slate-700 mb-1">Devise</label>
-          <input type="text" name="currency"
-                 value="{{ doc.currency or 'EUR' }}"
-                 maxlength="3"
-                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 uppercase">
+          <select name="currency" x-model="currency"
+                  class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="EUR">EUR - Euro</option>
+            <option value="USD">USD - Dollar</option>
+            <option value="GBP">GBP - Livre</option>
+            <option value="CHF">CHF - Franc suisse</option>
+            <option value="JPY">JPY - Yen</option>
+            <option value="CAD">CAD - Dollar CA</option>
+          </select>
+        </div>
+
+        <div x-show="currency !== 'EUR'" x-cloak>
+          <label class="block text-sm font-medium text-slate-700 mb-1">
+            Équivalent TTC en EUR
+            <span class="text-xs font-normal text-slate-400 ml-1">(utilisé dans les totaux)</span>
+          </label>
+          <div class="flex gap-1">
+            <input type="text" name="amount_ttc_eur" x-model="amountEur" inputmode="decimal"
+                   placeholder="0.00"
+                   class="flex-1 text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <button type="button" @click="fetchConversion()" :disabled="fetchingRate"
+                    title="Recalculer via BCE"
+                    class="px-2.5 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 disabled:opacity-50 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                   class="w-4 h-4" :class="fetchingRate ? 'animate-spin' : ''">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </button>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Taux BCE à la date de paiement (ou du jour)</p>
         </div>
       </div>
 
@@ -465,7 +517,7 @@ function docEditData() {
       <!-- Actions -->
       <div class="px-5 py-4 flex items-center justify-between bg-slate-50/50">
         <p class="text-xs text-slate-400">
-          Ajouté le {{ doc.created_at.strftime("%d/%m/%Y") if doc.created_at else "—" }}
+          Ajouté le {{ doc.created_at.strftime("%d/%m/%Y") if doc.created_at else "-" }}
           · {{ (doc.file_size / 1024) | round(1) }} Ko
           · {{ {"application/pdf": "PDF", "image/jpeg": "JPEG", "image/png": "PNG"}.get(doc.mime_type, doc.mime_type) }}
         </p>

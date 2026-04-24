@@ -55,9 +55,11 @@ class Document(Base, UUIDMixin, TimestampMixin):
     vat_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     vat_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True, default=Decimal("0.00"))
     amount_ttc: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    amount_ttc_eur: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     correspondent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("correspondents.id", ondelete="SET NULL"), nullable=True

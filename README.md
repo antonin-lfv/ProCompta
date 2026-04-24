@@ -1,6 +1,6 @@
 # ProCompta
 
-Gestionnaire de documents comptables — local, simple, sans abonnement.
+Gestionnaire de documents comptables - local, simple, sans abonnement.
 Organisez vos factures, reçus et relevés par année, correspondant et tags.
 
 ---

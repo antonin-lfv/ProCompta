@@ -15,6 +15,6 @@ def _date_fr(d: date) -> str:
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.filters["date_fr"] = _date_fr
 templates.env.globals.update({
-    "app_version": "0.2.5",
+    "app_version": "0.3.0",
     "current_year": date.today().year,
 })

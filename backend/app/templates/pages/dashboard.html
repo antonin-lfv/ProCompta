@@ -86,22 +86,25 @@
                 {{ doc.document_date.strftime("%d/%m/%Y") }}
               </td>
               <td class="px-4 py-3 text-slate-500">
-                {{ doc.correspondent.name if doc.correspondent else "—" }}
+                {{ doc.correspondent.name if doc.correspondent else "-" }}
               </td>
               <td class="px-4 py-3">
                 <div class="flex flex-wrap gap-1 justify-center">
                   {% for tag in doc.tags %}
                     {{ badge(tag.name, tag.color) }}
                   {% else %}
-                    <span class="text-slate-400">—</span>
+                    <span class="text-slate-400">-</span>
                   {% endfor %}
                 </div>
               </td>
               <td class="px-4 py-3 text-right font-medium text-slate-700 whitespace-nowrap">
-                {% if doc.amount_ttc %}
-                  {{ "%.2f"|format(doc.amount_ttc) }} {{ doc.currency }}
+                {% if doc.currency != "EUR" and doc.amount_ttc_eur %}
+                  {{ "%.2f"|format(doc.amount_ttc_eur) }} €
+                  <span class="text-xs text-slate-400 font-normal block">({{ "%.2f"|format(doc.amount_ttc) }} {{ doc.currency }})</span>
+                {% elif doc.amount_ttc %}
+                  {{ "%.2f"|format(doc.amount_ttc) }} €
                 {% else %}
-                  <span class="text-slate-400">—</span>
+                  <span class="text-slate-400">-</span>
                 {% endif %}
               </td>
             </tr>
