@@ -163,12 +163,6 @@ async def year_view(
     search: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> HTMLResponse:
-    exists = await session.scalar(
-        select(func.count(Document.id)).where(extract("year", Document.document_date) == year)
-    )
-    if not exists:
-        raise HTTPException(status_code=404, detail="Aucun document pour cette année")
-
     corr_uuid = _uuid(correspondent_id)
     dtype_uuid = _uuid(document_type_id)
     tag_uuids = [u for s in tag_ids if (u := _uuid(s))]
@@ -321,7 +315,9 @@ async def document_update_form(
         doc.tags = []
 
     await session.commit()
-    return RedirectResponse(f"/year/{doc.document_date.year}", status_code=303)
+    back = str(form.get("back", "")).strip()
+    redirect_url = back if back and back.startswith("/") else f"/year/{doc.document_date.year}"
+    return RedirectResponse(redirect_url, status_code=303)
 
 
 @router.post("/documents/{id}/delete")
@@ -334,7 +330,10 @@ async def document_delete_form(id: uuid.UUID, session: AsyncSession = Depends(ge
     await session.commit()
     delete_file(file_path)
     delete_preview(doc_id)
-    return RedirectResponse(f"/year/{year}", status_code=303)
+    remaining = await session.scalar(
+        select(func.count(Document.id)).where(extract("year", Document.document_date) == year)
+    )
+    return RedirectResponse(f"/year/{year}" if remaining else "/years", status_code=303)
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
