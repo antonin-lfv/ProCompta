@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.4.0] - 2026-04-25
+
+### Ajouté
+- **Dashboard enrichi** - 5 stats : dépenses, recettes, solde (avec variation N vs N-1 colorée), TVA déductible, TVA collectée
+- **Graphique évolution mensuelle** - barres groupées dépenses/recettes sur 12 mois (Chart.js)
+- **Doughnut dépenses par type** - répartition des dépenses de l'année par type de document
+- **Top 5 correspondants** - barres horizontales par volume de dépenses
+- **Page Rapports** (`/reports`) - nouvelle page accessible depuis la sidebar et depuis la vue année
+  - Sélecteur d'année + filtre trimestriel (T1 / T2 / T3 / T4)
+  - Bilan annuel : tableau HT / TVA / TTC par catégorie × type, totaux par section, solde global
+  - Bilan par correspondant : dépenses TTC, TVA déductible, recettes TTC, TVA collectée, solde
+  - Export CSV bilan (agrégé par catégorie × type × correspondant)
+  - Export CSV documents (liste complète avec toutes les métadonnées)
+- **Navigation croisée** - bouton "Bilan" dans la vue année → rapports ; bouton "Vue YYYY" dans les rapports → vue année
+
+### Corrigé
+- `_variation` : division par `abs(prev)` pour éviter un signe inversé quand le solde N-1 est négatif
+- `amount_ttc_eur` forcé à `None` côté serveur quand `currency == "EUR"` (évite les données orphelines)
+
+### Technique
+- `Chart.js 4.4` via CDN, chargé uniquement sur le dashboard
+- Filtre `extract("quarter", ...)` PostgreSQL via SQLAlchemy pour la granularité trimestrielle
+- Exports CSV UTF-8 avec BOM (compatible Excel), séparateur `;`, nommage `procompta_{year}[_T{q}]_{type}.csv`
+- Macro `stat_card` étendue avec paramètres optionnels `variation` et `variation_color`
+
+---
+
 ## [0.3.0] - 2026-04-24
 
 ### Ajouté

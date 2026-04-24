@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty_state %}
+
+{% block title %}Rapports {{ period_label }}{% endblock %}
+
+{% block content %}
+
+<div class="max-w-6xl mx-auto space-y-8">
+
+  <!-- Header -->
+  <div>
+    <h1 class="text-2xl font-bold text-slate-900">Rapports</h1>
+    <p class="text-sm text-slate-500 mt-0.5">Synthèse comptable par période</p>
+
+    {% if available_years %}
+    <!-- Contrôles : sélecteur d'année + boutons trimestre -->
+    <div class="flex items-center gap-3 mt-5 flex-wrap">
+
+      <!-- Sélecteur d'année -->
+      <form method="get" action="/reports" id="year-form">
+        {% if quarter %}<input type="hidden" name="quarter" value="{{ quarter }}">{% endif %}
+        <div class="relative">
+          <select name="year" onchange="this.form.submit()"
+                  class="appearance-none text-sm font-semibold bg-white border border-slate-200 rounded-lg pl-3.5 pr-9 py-2 text-slate-700 focus:outline-none focus:border-indigo-400 hover:border-slate-300 cursor-pointer transition-colors">
+            {% for y in available_years %}
+              <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-400">
+              <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+            </svg>
+          </div>
+        </div>
+      </form>
+
+      <!-- Séparateur -->
+      <div class="h-8 w-px bg-slate-200"></div>
+
+      <!-- Boutons trimestre -->
+      <div class="flex gap-1.5">
+        {% set quarters = [(none, "Année"), (1, "T1"), (2, "T2"), (3, "T3"), (4, "T4")] %}
+        {% for q_val, q_label in quarters %}
+          <a href="/reports?year={{ year }}{% if q_val %}&quarter={{ q_val }}{% endif %}"
+             class="px-3.5 py-2 rounded-lg text-sm font-medium border transition-colors
+               {% if quarter == q_val %}
+                 bg-indigo-600 text-white border-indigo-600 shadow-sm
+               {% else %}
+                 bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50
+               {% endif %}">
+            {{ q_label }}
+          </a>
+        {% endfor %}
+      </div>
+
+      <!-- Séparateur + lien vue année -->
+      <div class="h-8 w-px bg-slate-200 ml-1"></div>
+      <a href="/year/{{ year }}"
+         class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+        </svg>
+        Vue {{ year }}
+      </a>
+
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not available_years %}
+    <div class="bg-white rounded-xl border border-slate-200">
+      {{ empty_state("Aucun document. Importez des documents pour générer des rapports.") }}
+    </div>
+  {% else %}
+
+  <!-- ── Bilan annuel ──────────────────────────────────────────────────────── -->
+  <div class="space-y-3">
+
+    <div class="flex items-center justify-between">
+      <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Bilan {{ period_label }}</h2>
+      <a href="/reports/export/bilan?year={{ year }}{% if quarter %}&quarter={{ quarter }}{% endif %}"
+         class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        Export CSV bilan
+      </a>
+    </div>
+
+    {% if bilan_rows %}
+      {% set categories = [("depense", "Dépenses", "red"), ("recette", "Recettes", "green"), ("autre", "Autres", "slate")] %}
+      {% for cat_val, cat_label, cat_color in categories %}
+        {% set cat_rows = bilan_rows | selectattr("category", "eq", cat_val) | list %}
+        {% if cat_rows %}
+        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div class="flex items-center gap-2 px-4 py-3 bg-slate-50/50 border-b border-slate-200">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium
+              {% if cat_val == 'depense' %}bg-red-50 text-red-600
+              {% elif cat_val == 'recette' %}bg-green-50 text-green-600
+              {% else %}bg-slate-100 text-slate-500{% endif %}">
+              {{ cat_label }}
+            </span>
+            <span class="text-xs text-slate-400">{{ cat_rows | length }} ligne{% if cat_rows | length > 1 %}s{% endif %}</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-100">
+                <th class="text-left text-xs font-semibold text-slate-500 px-4 py-2.5">Type de document</th>
+                <th class="text-right text-xs font-semibold text-slate-500 px-4 py-2.5">Nb docs</th>
+                <th class="text-right text-xs font-semibold text-slate-500 px-4 py-2.5">Total HT</th>
+                <th class="text-right text-xs font-semibold text-slate-500 px-4 py-2.5">Total TVA</th>
+                <th class="text-right text-xs font-semibold text-slate-500 px-4 py-2.5">Total TTC (€)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+              {% for row in cat_rows %}
+              <tr class="hover:bg-slate-50/50">
+                <td class="px-4 py-2.5 text-slate-700">
+                  {% if row.type_name == "(sans type)" %}
+                    <span class="text-slate-400 italic">{{ row.type_name }}</span>
+                  {% else %}
+                    {{ row.type_name }}
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-right text-slate-500">{{ row.count }}</td>
+                <td class="px-4 py-2.5 text-right text-slate-500">
+                  {% if row.total_ht %}{{ "%.2f"|format(row.total_ht) }} €{% else %}<span class="text-slate-300">—</span>{% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-right text-slate-500">
+                  {% if row.total_tva %}{{ "%.2f"|format(row.total_tva) }} €{% else %}<span class="text-slate-300">—</span>{% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-right font-medium text-slate-700">{{ "%.2f"|format(row.total_ttc) }} €</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="border-t border-slate-200 bg-slate-50/50">
+                <td class="px-4 py-2.5 text-xs font-semibold text-slate-600" colspan="2">Total {{ cat_label }}</td>
+                <td class="px-4 py-2.5 text-right text-xs font-semibold text-slate-600">
+                  {{ "%.2f"|format(cat_rows | sum(attribute='total_ht')) }} €
+                </td>
+                <td class="px-4 py-2.5 text-right text-xs font-semibold text-slate-600">
+                  {{ "%.2f"|format(cat_rows | sum(attribute='total_tva')) }} €
+                </td>
+                <td class="px-4 py-2.5 text-right text-sm font-bold
+                  {% if cat_val == 'depense' %}text-red-600
+                  {% elif cat_val == 'recette' %}text-green-600
+                  {% else %}text-slate-700{% endif %}">
+                  {{ "%.2f"|format(cat_rows | sum(attribute='total_ttc')) }} €
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {% endif %}
+      {% endfor %}
+
+      <!-- Synthèse -->
+      {% set total_dep = bilan_rows | selectattr("category","eq","depense") | sum(attribute="total_ttc") %}
+      {% set total_rec = bilan_rows | selectattr("category","eq","recette") | sum(attribute="total_ttc") %}
+      {% set solde = total_rec - total_dep %}
+      <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <div class="flex flex-wrap gap-8">
+          <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wide font-medium">Total dépenses TTC</p>
+            <p class="text-xl font-bold text-red-600 mt-1">{{ "%.2f"|format(total_dep) }} €</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wide font-medium">Total recettes TTC</p>
+            <p class="text-xl font-bold text-green-600 mt-1">{{ "%.2f"|format(total_rec) }} €</p>
+          </div>
+          <div class="ml-auto">
+            <p class="text-xs text-slate-500 uppercase tracking-wide font-medium">Solde net</p>
+            <p class="text-xl font-bold mt-1 {% if solde >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+              {{ "%+.2f"|format(solde) }} €
+            </p>
+          </div>
+        </div>
+      </div>
+
+    {% else %}
+      <div class="bg-white rounded-xl border border-slate-200">
+        {{ empty_state("Aucun document pour " ~ period_label ~ ".") }}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Bilan par correspondant ───────────────────────────────────────────── -->
+  <div class="space-y-3">
+
+    <div class="flex items-center justify-between">
+      <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Par correspondant · {{ period_label }}</h2>
+      <a href="/reports/export/documents?year={{ year }}{% if quarter %}&quarter={{ quarter }}{% endif %}"
+         class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        Export CSV documents
+      </a>
+    </div>
+
+    {% if corr_rows %}
+    <div class="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+      <table class="w-full text-sm">
+        <colgroup>
+          <col class="w-48">
+          <col class="w-28"><col class="w-28">
+          <col class="w-28"><col class="w-28">
+          <col class="w-32">
+        </colgroup>
+        <thead>
+          <tr class="border-b border-slate-200 bg-slate-50/50">
+            <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Correspondant</th>
+            <th class="text-right text-xs font-semibold text-red-400 px-4 py-3">Dépenses TTC</th>
+            <th class="text-right text-xs font-semibold text-red-300 px-4 py-3">TVA déduc.</th>
+            <th class="text-right text-xs font-semibold text-green-500 px-4 py-3">Recettes TTC</th>
+            <th class="text-right text-xs font-semibold text-green-400 px-4 py-3">TVA coll.</th>
+            <th class="text-right text-xs font-semibold text-slate-500 px-4 py-3">Solde</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for row in corr_rows %}
+          <tr class="hover:bg-slate-50/50">
+            <td class="px-4 py-3 font-medium text-slate-700">
+              {% if row.name == "(sans correspondant)" %}
+                <span class="text-slate-400 italic">{{ row.name }}</span>
+              {% else %}
+                {{ row.name }}
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right text-slate-700">
+              {% if row.depenses.ttc %}{{ "%.2f"|format(row.depenses.ttc) }} €{% else %}<span class="text-slate-300">—</span>{% endif %}
+            </td>
+            <td class="px-4 py-3 text-right text-slate-500">
+              {% if row.depenses.tva %}{{ "%.2f"|format(row.depenses.tva) }} €{% else %}<span class="text-slate-300">—</span>{% endif %}
+            </td>
+            <td class="px-4 py-3 text-right text-slate-700">
+              {% if row.recettes.ttc %}{{ "%.2f"|format(row.recettes.ttc) }} €{% else %}<span class="text-slate-300">—</span>{% endif %}
+            </td>
+            <td class="px-4 py-3 text-right text-slate-500">
+              {% if row.recettes.tva %}{{ "%.2f"|format(row.recettes.tva) }} €{% else %}<span class="text-slate-300">—</span>{% endif %}
+            </td>
+            <td class="px-4 py-3 text-right font-semibold {% if row.solde >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+              {{ "%+.2f"|format(row.solde) }} €
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="border-t border-slate-200 bg-slate-50/50">
+            <td class="px-4 py-3 text-xs font-semibold text-slate-600">Total</td>
+            <td class="px-4 py-3 text-right text-sm font-bold text-red-600">
+              {{ "%.2f"|format(corr_rows | sum(attribute='depenses.ttc')) }} €
+            </td>
+            <td class="px-4 py-3 text-right text-xs font-semibold text-slate-600">
+              {{ "%.2f"|format(corr_rows | sum(attribute='depenses.tva')) }} €
+            </td>
+            <td class="px-4 py-3 text-right text-sm font-bold text-green-600">
+              {{ "%.2f"|format(corr_rows | sum(attribute='recettes.ttc')) }} €
+            </td>
+            <td class="px-4 py-3 text-right text-xs font-semibold text-slate-600">
+              {{ "%.2f"|format(corr_rows | sum(attribute='recettes.tva')) }} €
+            </td>
+            {% set total_solde = corr_rows | sum(attribute='solde') %}
+            <td class="px-4 py-3 text-right text-sm font-bold {% if total_solde >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+              {{ "%+.2f"|format(total_solde) }} €
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% else %}
+      <div class="bg-white rounded-xl border border-slate-200">
+        {{ empty_state("Aucun document pour " ~ period_label ~ ".") }}
+      </div>
+    {% endif %}
+
+  </div>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}

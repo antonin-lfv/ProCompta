@@ -1,10 +1,13 @@
+import csv
+import io
 import uuid
+from collections import defaultdict
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy import case, extract, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,12 +92,26 @@ _eur_amount = case(
     else_=Document.amount_ttc_eur,
 )
 
+_CAT_LABELS = {"depense": "Dépenses", "recette": "Recettes", "autre": "Autres"}
+_CAT_ORDER  = {"depense": 0, "recette": 1, "autre": 2}
+
+
+def _variation(current: Decimal, prev: Decimal, *, higher_is_better: bool = True) -> dict | None:
+    if not prev:
+        return None
+    pct = float((current - prev) / abs(prev) * 100)
+    sign = "+" if pct > 0 else ""
+    good = (pct > 0) == higher_is_better
+    return {"text": f"{sign}{pct:.1f}% vs N-1", "color": "green" if good else "red"}
+
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
     today = date.today()
+    _year_filter      = extract("year", Document.document_date) == today.year
+    _prev_year_filter = extract("year", Document.document_date) == today.year - 1
 
     no_type_count, no_correspondent_count = [
         (await session.scalar(q)) or 0
@@ -104,16 +121,79 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         ]
     ]
 
-    _year_filter = extract("year", Document.document_date) == today.year
     total_depenses = (await session.scalar(
-        select(func.sum(_eur_amount))
-        .where(_year_filter, Document.category == CategoryEnum.depense)
+        select(func.sum(_eur_amount)).where(_year_filter, Document.category == CategoryEnum.depense)
     )) or Decimal("0")
     total_recettes = (await session.scalar(
-        select(func.sum(_eur_amount))
-        .where(_year_filter, Document.category == CategoryEnum.recette)
+        select(func.sum(_eur_amount)).where(_year_filter, Document.category == CategoryEnum.recette)
     )) or Decimal("0")
     solde = total_recettes - total_depenses
+
+    # TVA
+    tva_deductible = (await session.scalar(
+        select(func.sum(Document.vat_amount)).where(_year_filter, Document.category == CategoryEnum.depense)
+    )) or Decimal("0")
+    tva_collectee = (await session.scalar(
+        select(func.sum(Document.vat_amount)).where(_year_filter, Document.category == CategoryEnum.recette)
+    )) or Decimal("0")
+
+    # N-1
+    prev_depenses = (await session.scalar(
+        select(func.sum(_eur_amount)).where(_prev_year_filter, Document.category == CategoryEnum.depense)
+    )) or Decimal("0")
+    prev_recettes = (await session.scalar(
+        select(func.sum(_eur_amount)).where(_prev_year_filter, Document.category == CategoryEnum.recette)
+    )) or Decimal("0")
+    prev_solde = prev_recettes - prev_depenses
+
+    # Données mensuelles pour le graphique
+    monthly_result = await session.execute(
+        select(
+            extract("month", Document.document_date).label("month"),
+            func.coalesce(func.sum(_eur_amount).filter(Document.category == CategoryEnum.depense), 0).label("depenses"),
+            func.coalesce(func.sum(_eur_amount).filter(Document.category == CategoryEnum.recette), 0).label("recettes"),
+        )
+        .where(_year_filter)
+        .group_by(extract("month", Document.document_date))
+        .order_by(extract("month", Document.document_date))
+    )
+    monthly_map = {int(r.month): r for r in monthly_result.all()}
+    monthly_depenses = [float(monthly_map[m].depenses if m in monthly_map else 0) for m in range(1, 13)]
+    monthly_recettes = [float(monthly_map[m].recettes if m in monthly_map else 0) for m in range(1, 13)]
+
+    # Répartition dépenses par type de document
+    type_result = await session.execute(
+        select(
+            DocumentType.name,
+            DocumentType.color,
+            func.coalesce(func.sum(_eur_amount), 0).label("total"),
+        )
+        .join(Document, Document.document_type_id == DocumentType.id)
+        .where(_year_filter, Document.category == CategoryEnum.depense)
+        .group_by(DocumentType.id, DocumentType.name, DocumentType.color)
+        .order_by(func.sum(_eur_amount).desc())
+    )
+    type_depenses = [
+        {"name": r.name, "color": r.color or "#6366f1", "total": float(r.total)}
+        for r in type_result.all()
+    ]
+
+    # Top 5 correspondants par dépenses
+    top_corr_result = await session.execute(
+        select(
+            Correspondent.name,
+            func.coalesce(func.sum(_eur_amount), 0).label("total"),
+        )
+        .join(Document, Document.correspondent_id == Correspondent.id)
+        .where(_year_filter, Document.category == CategoryEnum.depense)
+        .group_by(Correspondent.id, Correspondent.name)
+        .order_by(func.sum(_eur_amount).desc())
+        .limit(5)
+    )
+    top_correspondants = [
+        {"name": r.name, "total": float(r.total)}
+        for r in top_corr_result.all()
+    ]
 
     recent_result = await session.execute(
         select(Document)
@@ -129,6 +209,15 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         "total_recettes": total_recettes,
         "solde": solde,
         "solde_color": "green" if solde >= 0 else "red",
+        "tva_deductible": tva_deductible,
+        "tva_collectee": tva_collectee,
+        "depenses_var": _variation(total_depenses, prev_depenses, higher_is_better=False),
+        "recettes_var": _variation(total_recettes, prev_recettes, higher_is_better=True),
+        "solde_var":    _variation(solde, prev_solde, higher_is_better=True),
+        "monthly_depenses": monthly_depenses,
+        "monthly_recettes": monthly_recettes,
+        "type_depenses": type_depenses,
+        "top_correspondants": top_correspondants,
         "no_type_count": no_type_count,
         "no_correspondent_count": no_correspondent_count,
         "recent_documents": list(recent_result.scalars().all()),
@@ -316,8 +405,8 @@ async def document_update_form(
     doc.vat_amount = None if is_autre else _decimal(str(form.get("vat_amount", "")))
     doc.vat_rate = None if is_autre else _decimal(str(form.get("vat_rate", "")))
     doc.amount_ttc = None if is_autre else _decimal(str(form.get("amount_ttc", "")))
-    doc.amount_ttc_eur = None if is_autre else _decimal(str(form.get("amount_ttc_eur", "")))
     doc.currency = str(form.get("currency", "EUR")).strip() or "EUR"
+    doc.amount_ttc_eur = None if (is_autre or doc.currency == "EUR") else _decimal(str(form.get("amount_ttc_eur", "")))
     doc.notes = str(form.get("notes", "")).strip() or None
     doc.correspondent_id = _uuid(str(form.get("correspondent_id", "")))
     doc.document_type_id = _uuid(str(form.get("document_type_id", "")))
@@ -349,6 +438,206 @@ async def document_delete_form(id: uuid.UUID, session: AsyncSession = Depends(ge
         select(func.count(Document.id)).where(extract("year", Document.document_date) == year)
     )
     return RedirectResponse(f"/year/{year}" if remaining else "/years", status_code=303)
+
+
+# ── Rapports ──────────────────────────────────────────────────────────────────
+
+@router.get("/reports", response_class=HTMLResponse)
+async def reports(
+    request: Request,
+    year: int | None = Query(default=None),
+    quarter: int | None = Query(default=None, ge=1, le=4),
+    session: AsyncSession = Depends(get_session),
+) -> HTMLResponse:
+    today = date.today()
+
+    years_result = await session.execute(
+        select(extract("year", Document.document_date).label("year"))
+        .distinct()
+        .order_by(extract("year", Document.document_date).desc())
+    )
+    available_years = [int(r.year) for r in years_result.all()]
+    if year is None:
+        year = today.year if today.year in available_years else (available_years[0] if available_years else today.year)
+
+    _base = [extract("year", Document.document_date) == year]
+    if quarter:
+        _base.append(extract("quarter", Document.document_date) == quarter)
+
+    _Q_SUFFIX = {1: " · T1", 2: " · T2", 3: " · T3", 4: " · T4"}
+    period_label = str(year) + (_Q_SUFFIX.get(quarter, "") if quarter else "")
+
+    # Bilan annuel : catégorie × type de document
+    bilan_result = await session.execute(
+        select(
+            Document.category,
+            DocumentType.name.label("type_name"),
+            func.count(Document.id).label("count"),
+            func.coalesce(func.sum(Document.amount_ht), 0).label("total_ht"),
+            func.coalesce(func.sum(Document.vat_amount), 0).label("total_tva"),
+            func.coalesce(func.sum(_eur_amount), 0).label("total_ttc"),
+        )
+        .outerjoin(DocumentType, Document.document_type_id == DocumentType.id)
+        .where(*_base)
+        .group_by(Document.category, DocumentType.id, DocumentType.name)
+        .order_by(Document.category, DocumentType.name)
+    )
+    bilan_rows = [
+        {
+            "category":  r.category.value,
+            "type_name": r.type_name or "(sans type)",
+            "count":     int(r.count),
+            "total_ht":  float(r.total_ht or 0),
+            "total_tva": float(r.total_tva or 0),
+            "total_ttc": float(r.total_ttc or 0),
+        }
+        for r in bilan_result.all()
+    ]
+    bilan_rows.sort(key=lambda r: (_CAT_ORDER.get(r["category"], 3), r["type_name"]))
+
+    # Bilan par correspondant : pivot dépenses / recettes
+    corr_result = await session.execute(
+        select(
+            Correspondent.name.label("corr_name"),
+            Document.category,
+            func.count(Document.id).label("count"),
+            func.coalesce(func.sum(Document.amount_ht), 0).label("total_ht"),
+            func.coalesce(func.sum(Document.vat_amount), 0).label("total_tva"),
+            func.coalesce(func.sum(_eur_amount), 0).label("total_ttc"),
+        )
+        .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
+        .where(*_base)
+        .group_by(Correspondent.id, Correspondent.name, Document.category)
+        .order_by(Correspondent.name, Document.category)
+    )
+    _corr_pivot: dict[str, dict] = defaultdict(lambda: {
+        "depenses": {"count": 0, "ht": 0.0, "tva": 0.0, "ttc": 0.0},
+        "recettes": {"count": 0, "ht": 0.0, "tva": 0.0, "ttc": 0.0},
+    })
+    for r in corr_result.all():
+        name = r.corr_name or "(sans correspondant)"
+        if r.category == CategoryEnum.depense:
+            _corr_pivot[name]["depenses"] = {"count": int(r.count), "ht": float(r.total_ht or 0), "tva": float(r.total_tva or 0), "ttc": float(r.total_ttc or 0)}
+        elif r.category == CategoryEnum.recette:
+            _corr_pivot[name]["recettes"] = {"count": int(r.count), "ht": float(r.total_ht or 0), "tva": float(r.total_tva or 0), "ttc": float(r.total_ttc or 0)}
+    corr_rows = [
+        {
+            "name":     name,
+            "depenses": data["depenses"],
+            "recettes": data["recettes"],
+            "solde":    data["recettes"]["ttc"] - data["depenses"]["ttc"],
+        }
+        for name, data in sorted(_corr_pivot.items(), key=lambda x: x[0].lower())
+    ]
+
+    return templates.TemplateResponse(request, "pages/reports.html", {
+        "year": year,
+        "quarter": quarter,
+        "period_label": period_label,
+        "available_years": available_years,
+        "bilan_rows": bilan_rows,
+        "corr_rows": corr_rows,
+    })
+
+
+@router.get("/reports/export/documents")
+async def export_documents_csv(
+    year: int = Query(...),
+    quarter: int | None = Query(default=None, ge=1, le=4),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    _base = [extract("year", Document.document_date) == year]
+    if quarter:
+        _base.append(extract("quarter", Document.document_date) == quarter)
+
+    result = await session.execute(
+        select(Document)
+        .options(
+            selectinload(Document.correspondent),
+            selectinload(Document.document_type),
+            selectinload(Document.tags),
+        )
+        .where(*_base)
+        .order_by(Document.document_date.desc())
+    )
+    docs = result.scalars().all()
+
+    suffix = f"_T{quarter}" if quarter else ""
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["Titre", "Date", "Date paiement", "Catégorie", "Correspondant", "Type", "Tags", "Devise", "HT", "TVA", "TTC", "TTC EUR", "Notes"])
+    for doc in docs:
+        writer.writerow([
+            doc.title,
+            doc.document_date.isoformat() if doc.document_date else "",
+            doc.payment_date.isoformat() if doc.payment_date else "",
+            _CAT_LABELS.get(doc.category.value, doc.category.value),
+            doc.correspondent.name if doc.correspondent else "",
+            doc.document_type.name if doc.document_type else "",
+            ", ".join(t.name for t in doc.tags),
+            doc.currency,
+            str(doc.amount_ht or ""),
+            str(doc.vat_amount or ""),
+            str(doc.amount_ttc or ""),
+            str(doc.amount_ttc_eur or ""),
+            doc.notes or "",
+        ])
+    content = "﻿" + output.getvalue()
+    return StreamingResponse(
+        iter([content.encode("utf-8")]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="procompta_{year}{suffix}_documents.csv"'},
+    )
+
+
+@router.get("/reports/export/bilan")
+async def export_bilan_csv(
+    year: int = Query(...),
+    quarter: int | None = Query(default=None, ge=1, le=4),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    _base = [extract("year", Document.document_date) == year]
+    if quarter:
+        _base.append(extract("quarter", Document.document_date) == quarter)
+
+    result = await session.execute(
+        select(
+            Document.category,
+            DocumentType.name.label("type_name"),
+            Correspondent.name.label("corr_name"),
+            func.count(Document.id).label("count"),
+            func.coalesce(func.sum(Document.amount_ht), 0).label("total_ht"),
+            func.coalesce(func.sum(Document.vat_amount), 0).label("total_tva"),
+            func.coalesce(func.sum(_eur_amount), 0).label("total_ttc"),
+        )
+        .outerjoin(DocumentType, Document.document_type_id == DocumentType.id)
+        .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
+        .where(*_base)
+        .group_by(Document.category, DocumentType.id, DocumentType.name, Correspondent.id, Correspondent.name)
+        .order_by(Document.category, DocumentType.name, Correspondent.name)
+    )
+    rows = result.all()
+
+    suffix = f"_T{quarter}" if quarter else ""
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["Catégorie", "Type", "Correspondant", "Nb documents", "Total HT (€)", "Total TVA (€)", "Total TTC (€)"])
+    for r in rows:
+        writer.writerow([
+            _CAT_LABELS.get(r.category.value, r.category.value),
+            r.type_name or "(sans type)",
+            r.corr_name or "(sans correspondant)",
+            r.count,
+            f"{float(r.total_ht or 0):.2f}",
+            f"{float(r.total_tva or 0):.2f}",
+            f"{float(r.total_ttc or 0):.2f}",
+        ])
+    content = "﻿" + output.getvalue()
+    return StreamingResponse(
+        iter([content.encode("utf-8")]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="procompta_{year}{suffix}_bilan.csv"'},
+    )
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────

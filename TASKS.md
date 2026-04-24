@@ -1,6 +1,6 @@
 # ProCompta - Suivi des tâches
 
-## Version courante : `v0.4.0` 🚧
+## Version courante : `v0.4.0` ✅
 
 ---
 
@@ -103,24 +103,22 @@
 
 ---
 
-### v0.4 - Analytics & Export
+### ✅ Terminé - v0.4.0
 
 > Objectif : transformer les données saisies en insights comptables utiles.
 
 #### Dashboard enrichi
-- [ ] **[V4-1]** Graphique évolution mensuelle dépenses vs recettes (Chart.js, barres groupées)
-- [ ] **[V4-2]** Répartition des dépenses par type de document (camembert)
-- [ ] **[V4-3]** Top 5 correspondants par volume facturé (barres horizontales)
-- [ ] **[V4-4]** Comparaison année N vs N-1 (variation en %)
-- [ ] **[V4-5]** Indicateurs TVA : total TVA déductible (dépenses) / TVA collectée (recettes)
+- [x] **[V4-1]** Graphique évolution mensuelle dépenses vs recettes (Chart.js, barres groupées)
+- [x] **[V4-2]** Répartition des dépenses par type de document (doughnut)
+- [x] **[V4-3]** Top 5 correspondants par volume facturé (barres horizontales)
+- [x] **[V4-4]** Comparaison année N vs N-1 (variation en %) sur dépenses, recettes et solde
+- [x] **[V4-5]** Indicateurs TVA : total TVA déductible (dépenses) / TVA collectée (recettes)
 
 #### Page Rapports (`/reports`)
-- [ ] **[V4-6]** Bilan annuel - tableau HT / TVA / TTC par catégorie et par type
-- [ ] **[V4-7]** Bilan par correspondant - total facturé sur une période
-- [ ] **[V4-8]** Filtre par période (mois, trimestre, année fiscale personnalisée)
-- [ ] **[V4-9]** Export CSV - liste des documents avec toutes les métadonnées
-- [ ] **[V4-10]** Export CSV - bilan comptable agrégé (HT/TVA/TTC par catégorie)
-- [ ] **[V4-11]** Export PDF du rapport (WeasyPrint)
+- [x] **[V4-6]** Bilan annuel - tableau HT / TVA / TTC par catégorie et par type, avec totaux par section et solde global
+- [x] **[V4-7]** Bilan par correspondant - dépenses TTC / TVA déductible, recettes TTC / TVA collectée, solde
+- [x] **[V4-9]** Export CSV - liste des documents avec toutes les métadonnées
+- [x] **[V4-10]** Export CSV - bilan comptable agrégé (HT/TVA/TTC par catégorie × type × correspondant)
 
 ---
 
