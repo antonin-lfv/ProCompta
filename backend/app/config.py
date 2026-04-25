@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://procompta:changeme@db:5432/procompta"
     storage_path: str = "/app/storage"
+    backup_path: str = "/app/backups"
     api_port: int = 8000
 
 

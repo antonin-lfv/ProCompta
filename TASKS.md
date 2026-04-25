@@ -172,6 +172,10 @@
 - [ ] **[V7-6]** Préférences : devise par défaut, début d'exercice fiscal
 - [ ] **[V7-7]** Option multi-utilisateurs avec rôles (admin / lecteur)
 
+#### Backup
+- [ ] **[V7-8]** Bouton "Backup" dans la page profil — déclenche `POST /api/backup`, affiche le nom et le poids du fichier généré
+- [ ] **[V7-9]** Champ chemin de sauvegarde (à gauche du bouton backup) — permet de configurer le dossier de destination des backups (défaut : `backups/` à la racine du projet)
+
 ---
 
 ### v1.0 - Production Ready

@@ -18,6 +18,12 @@ storage/documents/*
 storage/previews/*
 !storage/documents/.gitkeep
 !storage/previews/.gitkeep
+storage/20*/
+storage/19*/
+
+# Backups
+backups/*
+!backups/.gitkeep
 
 # macOS
 .DS_Store

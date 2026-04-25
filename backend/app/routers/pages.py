@@ -21,7 +21,7 @@ from app.models.document_activity import ActivityEventEnum, DocumentActivity
 from app.models.notification import Notification, NotificationTypeEnum
 from app.models.document_type import DocumentType
 from app.models.tag import Tag
-from app.services.file_service import delete_file
+from app.services.file_service import delete_file, rename_file
 from app.services.preview_service import delete_preview
 from app.templating import templates
 from app.utils import slugify
@@ -597,8 +597,9 @@ async def document_update_form(
     doc = await _doc_or_404(session, id)
     form = await request.form()
 
-    # Capture old state for activity log
+    # Capture old state for activity log + file rename
     old_title = doc.title
+    old_file_path = doc.file_path
     old_corr_name = doc.correspondent.name if doc.correspondent else None
     old_type_name = doc.document_type.name if doc.document_type else None
     old_category = doc.category.value
@@ -661,6 +662,13 @@ async def document_update_form(
         for a in activities:
             session.add(a)
         await session.commit()
+
+    # Rename file if title or date changed
+    if doc.title != old_title or new_date != old_date:
+        new_path = rename_file(old_file_path, doc.id, doc.document_date, doc.title, doc.mime_type)
+        if new_path != old_file_path:
+            doc.file_path = new_path
+            await session.commit()
 
     await _sync_notification_pages(doc, session)
     back = str(form.get("back", "")).strip()

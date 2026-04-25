@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
-from app.routers import correspondents, document_types, documents, notifications, pages, tags
+from app.routers import backup, correspondents, document_types, documents, notifications, pages, tags
 from app.templating import templates
 
 app = FastAPI(title="ProCompta", version="0.1.0")
@@ -25,6 +25,7 @@ app.include_router(document_types.router, prefix="/api")
 app.include_router(tags.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(backup.router, prefix="/api")
 
 
 _ERROR_MESSAGES = {

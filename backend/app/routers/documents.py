@@ -1,4 +1,5 @@
 import subprocess
+import tempfile
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -6,6 +7,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import extract, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,19 +16,17 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.database import get_session
 from app.models.document import CategoryEnum, Document, document_tags
-from app.models.tag import Tag
-from pydantic import BaseModel
-
 from app.models.document_activity import ActivityEventEnum, DocumentActivity
 from app.models.notification import Notification, NotificationTypeEnum
+from app.models.tag import Tag
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
+from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, hash_bytes, save_file_bytes
+from app.services.preview_service import delete_preview, generate_preview
 
 
 class ConvertRequest(BaseModel):
     currency: str
     amount: Decimal
-from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, save_uploaded_file
-from app.services.preview_service import delete_preview, generate_preview
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -136,23 +136,34 @@ async def upload_document(
     if mime not in ALLOWED_MIME_TYPES:
         raise HTTPException(status_code=400, detail="Seuls les PDF et images (JPG, PNG) sont acceptés")
 
-    document_id = uuid.uuid4()
-    file_path, file_hash, file_size = await save_uploaded_file(file, document_id)
+    content = await file.read()
+    file_hash = hash_bytes(content)
+    file_size = len(content)
 
     duplicate = await session.scalar(select(Document).where(Document.file_hash == file_hash))
     if duplicate:
-        delete_file(file_path)
         raise HTTPException(status_code=409, detail="This file already exists", headers={"X-Duplicate-Id": str(duplicate.id)})
 
+    stem = Path(file.filename or "document").stem
+    document_id = uuid.uuid4()
+
+    pdf_date = None
+    if mime == "application/pdf":
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        pdf_date = _extract_pdf_date(tmp_path)
+        Path(tmp_path).unlink(missing_ok=True)
+
+    doc_date = pdf_date or date.today()
+    file_path = await save_file_bytes(content, document_id, doc_date, stem, mime)
     full_path = str(Path(settings.storage_path) / file_path)
-    pdf_date = _extract_pdf_date(full_path) if mime == "application/pdf" else None
 
     try:
         await generate_preview(full_path, document_id, mime)
     except Exception:
         pass
 
-    stem = Path(file.filename or "document").stem
     doc = Document(
         id=document_id,
         title=stem,
@@ -160,7 +171,7 @@ async def upload_document(
         file_hash=file_hash,
         mime_type=mime,
         file_size=file_size,
-        document_date=pdf_date or date.today(),
+        document_date=doc_date,
     )
     session.add(doc)
     await session.commit()
