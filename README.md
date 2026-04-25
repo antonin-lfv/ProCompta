@@ -1,39 +1,56 @@
-# ProCompta
+<h1 align="center">
+  <br>
+  ProCompta - Logiciel de suivi de comptabilité
+  <br>
+</h1>
 
-Gestionnaire de documents comptables — local, sans abonnement, sans cloud.
+<h4 align="center">Gestionnaire de documents comptables, local, sans abonnement, sans cloud.</h4>
 
-Organisez vos factures, relevés et reçus par année, correspondant et catégorie. Suivez vos dépenses et recettes, exportez vos bilans, gérez vos devises étrangères.
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-1.0.0-green.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Python-3.13+-blue.svg" alt="Python">
+  <img src="https://img.shields.io/badge/PostgreSQL-16-orange.svg" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/Docker-ready-2496ED.svg" alt="Docker">
+</p>
+
+<p align="center">
+  Organisez vos factures, relevés et reçus par année, correspondant et catégorie.<br>
+  Suivez vos dépenses et recettes, exportez vos bilans, gérez vos devises étrangères.
+</p>
+
+<p align="center">
+  <a href="#-installation">Installation</a> •
+  <a href="#-utilisation-quotidienne">Utilisation quotidienne</a> •
+  <a href="#-fonctionnalités">Fonctionnalités</a> •
+  <a href="#️-raccourcis-clavier">Raccourcis clavier</a> •
+  <a href="#️-stack">Stack</a>
+</p>
 
 ---
 
-## Prérequis
-
-- [Docker Desktop](https://docs.docker.com/get-docker/) (inclut Docker Compose v2)
-- macOS (testé) · Linux compatible
-
----
-
-## Installation
+## 🚀 Installation
 
 ```bash
-git clone <url-du-repo>
+git clone https://github.com/antonin-lfv/ProCompta.git
 cd ProCompta
+chmod +x setup.sh
 ./setup.sh
 ```
 
 Le script s'occupe de tout :
 
-- demande ton prénom, e-mail et mot de passe
+- vérifie que Docker est installé et démarré
+- demande le prénom, e-mail et mot de passe
 - génère automatiquement `SECRET_KEY` et le mot de passe PostgreSQL
 - crée les dossiers `storage/` et `backups/`
 - configure le domaine local `http://procompta.local` (optionnel, nécessite sudo)
 - build les images Docker et applique les migrations
 
-À la fin, l'URL et tes identifiants s'affichent dans le terminal.
+À la fin, l'URL et les identifiants s'affichent dans le terminal.
 
 ---
 
-## Utilisation quotidienne
+## 📅 Utilisation quotidienne
 
 ```bash
 # Démarrer
@@ -51,7 +68,7 @@ docker compose down -v
 
 ---
 
-## Fonctionnalités
+## ✨ Fonctionnalités
 
 | Catégorie | Détail |
 |-----------|--------|
@@ -68,7 +85,7 @@ docker compose down -v
 
 ---
 
-## Raccourcis clavier
+## ⌨️ Raccourcis clavier
 
 | Touche | Action |
 |--------|--------|
@@ -79,7 +96,7 @@ docker compose down -v
 
 ---
 
-## Stack
+## 🛠️ Stack
 
 | Couche | Technologie |
 |--------|-------------|
@@ -91,43 +108,3 @@ docker compose down -v
 | Packaging | uv |
 | Reverse proxy | Caddy |
 | Infrastructure | Docker Compose |
-
----
-
-## Structure
-
-```
-ProCompta/
-├── setup.sh                  # Installation en une commande
-├── docker-compose.yml
-├── Caddyfile
-├── .env.example
-├── storage/                  # Fichiers uploadés (bind mount Docker)
-│   └── previews/
-├── backups/                  # Backups téléchargés depuis le profil
-└── backend/
-    ├── Dockerfile
-    ├── entrypoint.sh         # Build Tailwind CSS + démarrage uvicorn
-    ├── tailwind.config.js
-    ├── pyproject.toml
-    └── app/
-        ├── models/
-        ├── routers/
-        ├── services/
-        └── templates/
-```
-
----
-
-## Commandes utiles
-
-```bash
-# Appliquer de nouvelles migrations après modification des modèles
-docker compose exec api uv run alembic upgrade head
-
-# Créer une migration
-docker compose exec api uv run alembic revision --autogenerate -m "description"
-
-# Reconstruire après changement de dépendances
-docker compose up --build -d
-```

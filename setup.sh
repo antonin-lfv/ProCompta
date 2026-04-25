@@ -11,7 +11,7 @@ warn()    { echo -e "${YELLOW}⚠${NC}  $*"; }
 die()     { echo -e "${RED}✗${NC}  $*" >&2; exit 1; }
 
 echo ""
-echo -e "${BOLD}ProCompta — Installation${NC}"
+echo -e "${BOLD}ProCompta - Installation${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -31,7 +31,7 @@ success "Docker opérationnel."
 
 # ── .env ──────────────────────────────────────────────────────────────────────
 if [ -f ".env" ]; then
-  warn ".env existe déjà — conservé tel quel."
+  warn ".env existe déjà - conservé tel quel."
   warn "Supprime-le manuellement si tu veux repartir de zéro."
 else
   echo ""

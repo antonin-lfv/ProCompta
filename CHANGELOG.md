@@ -3,39 +3,39 @@
 ## [1.0.0] - 2026-04-25
 
 ### Ajouté
-- **Tooltips stylisés** — pill noire instantanée sur tous les boutons action de la page d'édition (historique, télécharger, e-mail, ouvrir, archiver/désarchiver) et sur le bouton d'import de la vue année
-- **Badge raccourci** dans la barre de recherche navbar — badge `⌨ /` affiché à droite du champ, disparaît quand le champ est actif (pattern GitHub/Linear)
+- **Tooltips stylisés** - pill noire instantanée sur tous les boutons action de la page d'édition (historique, télécharger, e-mail, ouvrir, archiver/désarchiver) et sur le bouton d'import de la vue année
+- **Badge raccourci** dans la barre de recherche navbar - badge `⌨ /` affiché à droite du champ, disparaît quand le champ est actif (pattern GitHub/Linear)
 
 ### Corrigé
-- `GET /api/documents/{id}/file` — `Request` manquant dans les imports FastAPI (causait une erreur 422 `Field required`)
-- `purge_previews` — utilisation de `.scalars().all()` plus robuste pour la requête `select(Document.id)`
+- `GET /api/documents/{id}/file` - `Request` manquant dans les imports FastAPI (causait une erreur 422 `Field required`)
+- `purge_previews` - utilisation de `.scalars().all()` plus robuste pour la requête `select(Document.id)`
 
 ---
 
 ## [0.9.0] - 2026-04-25
 
 ### Ajouté
-- **ETags sur les fichiers documents** — `GET /api/documents/{id}/file` retourne un header `ETag` basé sur le hash SHA-256 du fichier ; répondavec `304 Not Modified` si le client envoie `If-None-Match` correspondant ; `Cache-Control: private, max-age=31536000, immutable`
-- **Lazy loading** — attribut `loading="lazy"` sur l'image dans la modale de preview
+- **ETags sur les fichiers documents** - `GET /api/documents/{id}/file` retourne un header `ETag` basé sur le hash SHA-256 du fichier ; répondavec `304 Not Modified` si le client envoie `If-None-Match` correspondant ; `Cache-Control: private, max-age=31536000, immutable`
+- **Lazy loading** - attribut `loading="lazy"` sur l'image dans la modale de preview
 
 ### Technique
-- **Tailwind CSS CLI** — remplacement du CDN `play.tailwindcss.com` (300+ KB, dépendance externe) par un build purgé local (~10 KB) ; binaire standalone `tailwindcss-linux-x64 v3.4.17` téléchargé dans le Dockerfile, build pendant `docker build`, servi via `/static/css/tailwind.css`
-- `backend/tailwind.config.js` — scanne `./app/templates/**/*.html`, étend `fontFamily.sans` avec Inter
-- `backend/app/static/css/input.css` — directives `@tailwind base/components/utilities`
-- `backend/app/static/css/tailwind.css` — ignoré par git (généré au build)
+- **Tailwind CSS CLI** - remplacement du CDN `play.tailwindcss.com` (300+ KB, dépendance externe) par un build purgé local (~10 KB) ; binaire standalone `tailwindcss-linux-x64 v3.4.17` téléchargé dans le Dockerfile, build pendant `docker build`, servi via `/static/css/tailwind.css`
+- `backend/tailwind.config.js` - scanne `./app/templates/**/*.html`, étend `fontFamily.sans` avec Inter
+- `backend/app/static/css/input.css` - directives `@tailwind base/components/utilities`
+- `backend/app/static/css/tailwind.css` - ignoré par git (généré au build)
 
 ---
 
 ## [0.8.0] - 2026-04-25
 
 ### Ajouté
-- **Raccourcis clavier** — `/` focus la barre de recherche ; `N` ouvre le sélecteur de fichier (si sur une vue année) ou redirige vers l'année courante ; `?` affiche la modale d'aide des raccourcis ; `Esc` ferme les modales
-- **Purge des previews orphelines** — bouton dans la page Profil (section Maintenance) : supprime les fichiers `previews/*.png` sans document associé en base, affiche le nombre de fichiers supprimés
+- **Raccourcis clavier** - `/` focus la barre de recherche ; `N` ouvre le sélecteur de fichier (si sur une vue année) ou redirige vers l'année courante ; `?` affiche la modale d'aide des raccourcis ; `Esc` ferme les modales
+- **Purge des previews orphelines** - bouton dans la page Profil (section Maintenance) : supprime les fichiers `previews/*.png` sans document associé en base, affiche le nombre de fichiers supprimés
 
 ### Technique
-- `POST /profile/purge-previews` — scan `storage/previews/`, cross-référence avec les IDs documents en base, supprime les orphelins
-- Listener `@trigger-upload.window` sur le composant Alpine de la vue année — déclenche le `<input type=file>` natif
-- Script keydown global en fin de `base.html` — skip si focus sur `INPUT/TEXTAREA/SELECT` ou `contentEditable`, skip si `Ctrl/Meta/Alt`
+- `POST /profile/purge-previews` - scan `storage/previews/`, cross-référence avec les IDs documents en base, supprime les orphelins
+- Listener `@trigger-upload.window` sur le composant Alpine de la vue année - déclenche le `<input type=file>` natif
+- Script keydown global en fin de `base.html` - skip si focus sur `INPUT/TEXTAREA/SELECT` ou `contentEditable`, skip si `Ctrl/Meta/Alt`
 - Modale raccourcis en `z-[70]` (au-dessus de la preview modale en `z-50`)
 
 ---
@@ -43,22 +43,22 @@
 ## [0.7.0] - 2026-04-25
 
 ### Ajouté
-- **Authentification** — page de login (email + mot de passe), session cookie httpOnly signée HMAC (30 jours), middleware protégeant toutes les routes (pages → redirect `/login`, API → 401 JSON)
-- **Compte admin** — créé automatiquement au premier démarrage depuis les variables `ADMIN_NAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` du `.env`
-- **Page Profil** (`/profile`) — modification du nom et de l'email, changement de mot de passe (ancien / nouveau / confirmation), préférences (devise par défaut, mois de début d'exercice fiscal), déconnexion
-- **Backup téléchargeable** — bouton "Télécharger un backup" : génère un `.zip` (dump SQL + fichiers storage) et le télécharge directement dans le navigateur
-- **Import backup** — upload d'un `.zip`, confirmation par mot de passe, avertissement irréversible, restaure DB + storage puis redirige vers `/login`
-- **Nom dans la navbar** — icône profil cliquable + prénom affiché à droite, lien vers `/profile`
-- **Reverse proxy Caddy** — domaine local `http://procompta.local` (port 80), entrée `/etc/hosts` one-shot
+- **Authentification** - page de login (email + mot de passe), session cookie httpOnly signée HMAC (30 jours), middleware protégeant toutes les routes (pages → redirect `/login`, API → 401 JSON)
+- **Compte admin** - créé automatiquement au premier démarrage depuis les variables `ADMIN_NAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` du `.env`
+- **Page Profil** (`/profile`) - modification du nom et de l'email, changement de mot de passe (ancien / nouveau / confirmation), préférences (devise par défaut, mois de début d'exercice fiscal), déconnexion
+- **Backup téléchargeable** - bouton "Télécharger un backup" : génère un `.zip` (dump SQL + fichiers storage) et le télécharge directement dans le navigateur
+- **Import backup** - upload d'un `.zip`, confirmation par mot de passe, avertissement irréversible, restaure DB + storage puis redirige vers `/login`
+- **Nom dans la navbar** - icône profil cliquable + prénom affiché à droite, lien vers `/profile`
+- **Reverse proxy Caddy** - domaine local `http://procompta.local` (port 80), entrée `/etc/hosts` one-shot
 
 ### Technique
 - Modèle `User` : `name`, `email` (unique), `hashed_password` (scrypt), `default_currency`, `fiscal_year_start`, `backup_path`
-- Migration Alembic `20260425_0008` — table `users`
-- `AuthMiddleware` (Starlette BaseHTTPMiddleware) — vérifie le cookie `procompta_session`, charge l'user en `request.state.user`
-- Tokens HMAC signés (stdlib uniquement : `hmac`, `hashlib`, `base64`, `json`) — aucune dépendance ajoutée
-- Helper `render()` dans `templating.py` — injecte `current_user` dans tous les templates automatiquement
-- `GET /api/backup/download` — `StreamingResponse` zip en mémoire (`io.BytesIO`)
-- `POST /api/backup/restore` — reset schema public + `psql` restore + extraction storage
+- Migration Alembic `20260425_0008` - table `users`
+- `AuthMiddleware` (Starlette BaseHTTPMiddleware) - vérifie le cookie `procompta_session`, charge l'user en `request.state.user`
+- Tokens HMAC signés (stdlib uniquement : `hmac`, `hashlib`, `base64`, `json`) - aucune dépendance ajoutée
+- Helper `render()` dans `templating.py` - injecte `current_user` dans tous les templates automatiquement
+- `GET /api/backup/download` - `StreamingResponse` zip en mémoire (`io.BytesIO`)
+- `POST /api/backup/restore` - reset schema public + `psql` restore + extraction storage
 
 ---
 

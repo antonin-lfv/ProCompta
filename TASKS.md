@@ -165,19 +165,19 @@
 - [x] **[V7-1]** Page de login (email + mot de passe, local)
 - [x] **[V7-2]** Session avec cookie sécurisé (httpOnly, 30 jours, signé HMAC)
 - [x] **[V7-3]** Page de changement de mot de passe (ancien / nouveau / confirmation)
-- [x] **[V7-4]** Protection de toutes les routes (middleware — pages → redirect /login, API → 401 JSON)
+- [x] **[V7-4]** Protection de toutes les routes (middleware - pages → redirect /login, API → 401 JSON)
 
 #### Profil utilisateur
-- [x] **[V7-5]** Page profil (`/profile`) — nom, email, déconnexion
+- [x] **[V7-5]** Page profil (`/profile`) - nom, email, déconnexion
 - [x] **[V7-6]** Préférences : devise par défaut, premier mois de l'exercice fiscal
-- ~~**[V7-7]**~~ Multi-utilisateurs — écarté (usage solo)
+- ~~**[V7-7]**~~ Multi-utilisateurs - écarté (usage solo)
 
 #### Backup
-- [x] **[V7-8]** Bouton "Télécharger un backup" dans la page profil — `GET /api/backup/download`, téléchargement direct du zip dans le navigateur
-- [x] **[V7-9]** Import backup — mot de passe requis, avertissement irréversible, restaure DB + storage, redirige vers /login
+- [x] **[V7-8]** Bouton "Télécharger un backup" dans la page profil - `GET /api/backup/download`, téléchargement direct du zip dans le navigateur
+- [x] **[V7-9]** Import backup - mot de passe requis, avertissement irréversible, restaure DB + storage, redirige vers /login
 
 #### Infrastructure
-- [x] **[V7-10]** Reverse proxy Caddy — domaine local `http://procompta.local` (port 80), entrée `/etc/hosts` one-shot
+- [x] **[V7-10]** Reverse proxy Caddy - domaine local `http://procompta.local` (port 80), entrée `/etc/hosts` one-shot
 
 ---
 
@@ -192,7 +192,7 @@
 
 ### ✅ Terminé - v0.9.0
 
-> Objectif : performance — zéro CDN Tailwind, cache HTTP des fichiers.
+> Objectif : performance - zéro CDN Tailwind, cache HTTP des fichiers.
 
 - [x] **[V8-6]** Remplacement du CDN Tailwind par build CLI (binaire standalone v3.4.17, purgé au `docker build`)
 - [x] **[V8-7]** ETags + Cache-Control sur `GET /api/documents/{id}/file` (hash SHA-256 comme ETag, 304 si inchangé)
@@ -205,12 +205,12 @@
 > Objectif : tooltips d'aide + finalisation production.
 
 - [x] **[V8-5]** Tooltips stylisés sur les boutons action (édition, archivage, import, raccourci `/`)
-- [x] **[V8-1]** Thème sombre — écarté pour l'instant
-- [x] **[V8-2]** Responsive — écarté (usage Docker desktop uniquement)
-- [x] **[V8-4]** Onboarding — écarté (usage solo)
-- [x] **[V8-8]** Scroll infini — écarté (pagination suffisante)
-- [x] **[V8-10]** Export backup — fait en v0.7.0
-- [x] **[V8-11]** Import backup — fait en v0.7.0
+- [x] **[V8-1]** Thème sombre - écarté pour l'instant
+- [x] **[V8-2]** Responsive - écarté (usage Docker desktop uniquement)
+- [x] **[V8-4]** Onboarding - écarté (usage solo)
+- [x] **[V8-8]** Scroll infini - écarté (pagination suffisante)
+- [x] **[V8-10]** Export backup - fait en v0.7.0
+- [x] **[V8-11]** Import backup - fait en v0.7.0
 
 ---
 
