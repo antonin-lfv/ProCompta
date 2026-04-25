@@ -20,10 +20,15 @@
 
 <p align="center">
   <a href="#-installation">Installation</a> •
-  <a href="#-utilisation-quotidienne">Utilisation quotidienne</a> •
   <a href="#-fonctionnalités">Fonctionnalités</a> •
   <a href="#️-raccourcis-clavier">Raccourcis clavier</a> •
   <a href="#️-stack">Stack</a>
+</p>
+
+## Aperçu
+
+<p align="center">
+<img width="1624" height="1062" alt="main_page" src="https://github.com/user-attachments/assets/b4957d8f-c601-4096-aab9-f4f27d76961d" />
 </p>
 
 ---
@@ -47,24 +52,6 @@ Le script s'occupe de tout :
 - build les images Docker et applique les migrations
 
 À la fin, l'URL et les identifiants s'affichent dans le terminal.
-
----
-
-## 📅 Utilisation quotidienne
-
-```bash
-# Démarrer
-docker compose up -d
-
-# Arrêter
-docker compose down
-
-# Logs en temps réel
-docker compose logs -f api
-
-# Reset complet (supprime la base de données)
-docker compose down -v
-```
 
 ---
 
