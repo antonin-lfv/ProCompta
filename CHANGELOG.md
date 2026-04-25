@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0] - 2026-04-25
+
+### Ajouté
+- **Recherche globale** — barre de recherche dans la navbar, redirige vers `/documents?search=…`
+- **Highlight des résultats** — filtre Jinja2 `highlight` : les termes cherchés sont surlignés en jaune dans les titres
+- **Tri des colonnes** — macro `sort_th` : clic sur Titre / Date / Correspondant / Montant TTC dans les tableaux, flèche d'indication, ordre persisté dans l'URL
+- **Filtre par plage de dates** — champs `date_from` / `date_to` dans les formulaires de filtres (vue année + tous les documents)
+- **Filtre par montant** — champs `amount_min` / `amount_max` (EUR) dans les mêmes formulaires
+- **Archivage** — bouton "Archiver / Désarchiver" dans la page d'édition (PATCH JSON) ; documents archivés exclus de tous les totaux (dashboard, vue année, rapports, exports) ; section "Archivés" en bas de la vue année ; vue transversale `/documents?show_archived=1`
+- **Pagination** — 50 documents par page sur `/documents`, avec contrôles prev/next + numéros, filtres et tri préservés
+- **Aperçu modal** — bouton œil sur chaque ligne : overlay fond flouté, preview du fichier (iframe PDF / img), toutes les métadonnées, lien "Modifier"
+- **Limite notes** — 250 caractères max sur les notes, compteur temps réel avec alerte amber à 240
+
+### Technique
+- Filtre Jinja2 `highlight(text, search)` dans `templating.py` (markupsafe, regex IGNORECASE)
+- `sort_th` macro dans `macros.html` — paramètres `col`, `default_order`, `align`
+- `_sort_base_url()` helper préservant tous les filtres actifs dans les URLs de tri
+- Migration Alembic `20260425_0005` — colonne `archived BOOLEAN NOT NULL DEFAULT false`
+- `Document.archived == False` ajouté systématiquement dans dashboard, years_list, reports, exports, available_years
+- `_PAGE_SIZE = 50` dans `documents_list`, count query séparé pour la pagination
+
+---
+
 ## [0.4.0] - 2026-04-25
 
 ### Ajouté

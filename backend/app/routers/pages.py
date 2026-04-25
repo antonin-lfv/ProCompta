@@ -123,39 +123,40 @@ def _variation(current: Decimal, prev: Decimal, *, higher_is_better: bool = True
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
     today = date.today()
-    _year_filter      = extract("year", Document.document_date) == today.year
-    _prev_year_filter = extract("year", Document.document_date) == today.year - 1
+    _na   = Document.archived == False
+    _year_filter      = (extract("year", Document.document_date) == today.year,     _na)
+    _prev_year_filter = (extract("year", Document.document_date) == today.year - 1, _na)
 
     no_type_count, no_correspondent_count = [
         (await session.scalar(q)) or 0
         for q in [
-            select(func.count(Document.id)).where(Document.document_type_id.is_(None)),
-            select(func.count(Document.id)).where(Document.correspondent_id.is_(None)),
+            select(func.count(Document.id)).where(_na, Document.document_type_id.is_(None)),
+            select(func.count(Document.id)).where(_na, Document.correspondent_id.is_(None)),
         ]
     ]
 
     total_depenses = (await session.scalar(
-        select(func.sum(_eur_amount)).where(_year_filter, Document.category == CategoryEnum.depense)
+        select(func.sum(_eur_amount)).where(*_year_filter, Document.category == CategoryEnum.depense)
     )) or Decimal("0")
     total_recettes = (await session.scalar(
-        select(func.sum(_eur_amount)).where(_year_filter, Document.category == CategoryEnum.recette)
+        select(func.sum(_eur_amount)).where(*_year_filter, Document.category == CategoryEnum.recette)
     )) or Decimal("0")
     solde = total_recettes - total_depenses
 
     # TVA
     tva_deductible = (await session.scalar(
-        select(func.sum(Document.vat_amount)).where(_year_filter, Document.category == CategoryEnum.depense)
+        select(func.sum(Document.vat_amount)).where(*_year_filter, Document.category == CategoryEnum.depense)
     )) or Decimal("0")
     tva_collectee = (await session.scalar(
-        select(func.sum(Document.vat_amount)).where(_year_filter, Document.category == CategoryEnum.recette)
+        select(func.sum(Document.vat_amount)).where(*_year_filter, Document.category == CategoryEnum.recette)
     )) or Decimal("0")
 
     # N-1
     prev_depenses = (await session.scalar(
-        select(func.sum(_eur_amount)).where(_prev_year_filter, Document.category == CategoryEnum.depense)
+        select(func.sum(_eur_amount)).where(*_prev_year_filter, Document.category == CategoryEnum.depense)
     )) or Decimal("0")
     prev_recettes = (await session.scalar(
-        select(func.sum(_eur_amount)).where(_prev_year_filter, Document.category == CategoryEnum.recette)
+        select(func.sum(_eur_amount)).where(*_prev_year_filter, Document.category == CategoryEnum.recette)
     )) or Decimal("0")
     prev_solde = prev_recettes - prev_depenses
 
@@ -166,7 +167,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
             func.coalesce(func.sum(_eur_amount).filter(Document.category == CategoryEnum.depense), 0).label("depenses"),
             func.coalesce(func.sum(_eur_amount).filter(Document.category == CategoryEnum.recette), 0).label("recettes"),
         )
-        .where(_year_filter)
+        .where(*_year_filter)
         .group_by(extract("month", Document.document_date))
         .order_by(extract("month", Document.document_date))
     )
@@ -182,7 +183,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
             func.coalesce(func.sum(_eur_amount), 0).label("total"),
         )
         .join(Document, Document.document_type_id == DocumentType.id)
-        .where(_year_filter, Document.category == CategoryEnum.depense)
+        .where(*_year_filter, Document.category == CategoryEnum.depense)
         .group_by(DocumentType.id, DocumentType.name, DocumentType.color)
         .order_by(func.sum(_eur_amount).desc())
     )
@@ -198,7 +199,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
             func.coalesce(func.sum(_eur_amount), 0).label("total"),
         )
         .join(Document, Document.correspondent_id == Correspondent.id)
-        .where(_year_filter, Document.category == CategoryEnum.depense)
+        .where(*_year_filter, Document.category == CategoryEnum.depense)
         .group_by(Correspondent.id, Correspondent.name)
         .order_by(func.sum(_eur_amount).desc())
         .limit(5)
@@ -211,6 +212,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
     recent_result = await session.execute(
         select(Document)
         .options(selectinload(Document.correspondent), selectinload(Document.document_type), selectinload(Document.tags))
+        .where(_na)
         .order_by(Document.created_at.desc())
         .limit(5)
     )
@@ -254,6 +256,7 @@ async def years_list(request: Request, session: AsyncSession = Depends(get_sessi
                 0,
             ).label("total_depenses"),
         )
+        .where(Document.archived == False)
         .group_by(extract("year", Document.document_date))
         .order_by(extract("year", Document.document_date).desc())
     )
@@ -270,6 +273,10 @@ async def year_view(
     document_type_id: str | None = Query(default=None),
     tag_ids: list[str] = Query(default=[]),
     search: str | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    amount_min: str | None = Query(default=None),
+    amount_max: str | None = Query(default=None),
     sort: str = Query(default="date"),
     order: str = Query(default="desc"),
     session: AsyncSession = Depends(get_session),
@@ -277,6 +284,10 @@ async def year_view(
     corr_uuid = _uuid(correspondent_id)
     dtype_uuid = _uuid(document_type_id)
     tag_uuids = [u for s in tag_ids if (u := _uuid(s))]
+    _date_from = _date(date_from)
+    _date_to = _date(date_to)
+    _amount_min = _decimal(amount_min)
+    _amount_max = _decimal(amount_max)
 
     if sort not in _SORT_COLS:
         sort = "date"
@@ -288,7 +299,7 @@ async def year_view(
         select(Document)
         .options(selectinload(Document.tags), selectinload(Document.correspondent), selectinload(Document.document_type))
         .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
-        .where(extract("year", Document.document_date) == year)
+        .where(extract("year", Document.document_date) == year, Document.archived == False)
     )
     if corr_uuid:
         stmt = stmt.where(Document.correspondent_id == corr_uuid)
@@ -296,6 +307,14 @@ async def year_view(
         stmt = stmt.where(Document.document_type_id == dtype_uuid)
     if search and search.strip():
         stmt = stmt.where(Document.title.ilike(f"%{search.strip()}%"))
+    if _date_from:
+        stmt = stmt.where(Document.document_date >= _date_from)
+    if _date_to:
+        stmt = stmt.where(Document.document_date <= _date_to)
+    if _amount_min is not None:
+        stmt = stmt.where(_eur_amount >= _amount_min)
+    if _amount_max is not None:
+        stmt = stmt.where(_eur_amount <= _amount_max)
     for tid in tag_uuids:
         stmt = stmt.where(Document.id.in_(
             select(document_tags.c.document_id).where(document_tags.c.tag_id == tid)
@@ -311,6 +330,14 @@ async def year_view(
     docs_recettes = [d for d in docs if d.category == CategoryEnum.recette]
     docs_autres   = [d for d in docs if d.category == CategoryEnum.autre]
 
+    archived_result = await session.execute(
+        select(Document)
+        .options(selectinload(Document.tags), selectinload(Document.correspondent), selectinload(Document.document_type))
+        .where(extract("year", Document.document_date) == year, Document.archived == True)
+        .order_by(Document.document_date.desc())
+    )
+    docs_archived = list(archived_result.scalars().all())
+
     def _eur(d: Document) -> Decimal:
         return (d.amount_ttc if d.currency == "EUR" else d.amount_ttc_eur) or Decimal("0")
 
@@ -324,6 +351,10 @@ async def year_view(
         ("correspondent_id", str(corr_uuid) if corr_uuid else ""),
         ("document_type_id", str(dtype_uuid) if dtype_uuid else ""),
         ("search", search or ""),
+        ("date_from", date_from or ""),
+        ("date_to", date_to or ""),
+        ("amount_min", amount_min or ""),
+        ("amount_max", amount_max or ""),
         *[("tag_ids", str(t)) for t in tag_uuids],
     ]
 
@@ -333,6 +364,7 @@ async def year_view(
         "docs_depenses": docs_depenses,
         "docs_recettes": docs_recettes,
         "docs_autres": docs_autres,
+        "docs_archived": docs_archived,
         "total_depenses": total_depenses,
         "total_recettes": total_recettes,
         "has_foreign_currency": has_foreign_currency,
@@ -344,8 +376,12 @@ async def year_view(
             "document_type_id": str(dtype_uuid) if dtype_uuid else "",
             "tag_ids": [str(t) for t in tag_uuids],
             "search": search or "",
+            "date_from": date_from or "",
+            "date_to": date_to or "",
+            "amount_min": amount_min or "",
+            "amount_max": amount_max or "",
         },
-        "has_filters": any([corr_uuid, dtype_uuid, tag_uuids, search]),
+        "has_filters": any([corr_uuid, dtype_uuid, tag_uuids, search, _date_from, _date_to, _amount_min, _amount_max]),
         "sort": sort,
         "order": order,
         "sort_base_url": _sort_base_url(f"/year/{year}", _filter_params),
@@ -354,14 +390,23 @@ async def year_view(
 
 # ── Tous les documents ───────────────────────────────────────────────────────
 
+_PAGE_SIZE = 50
+
+
 @router.get("/documents", response_class=HTMLResponse)
 async def documents_list(
     request: Request,
     no_type: bool = Query(default=False),
     no_correspondent: bool = Query(default=False),
+    show_archived: bool = Query(default=False),
     search: str | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    amount_min: str | None = Query(default=None),
+    amount_max: str | None = Query(default=None),
     sort: str = Query(default="date"),
     order: str = Query(default="desc"),
+    page: int = Query(default=1, ge=1),
     session: AsyncSession = Depends(get_session),
 ) -> HTMLResponse:
     if sort not in _SORT_COLS:
@@ -370,28 +415,51 @@ async def documents_list(
         order = "desc"
     order_fn = sa_desc if order == "desc" else sa_asc
 
+    _date_from = _date(date_from)
+    _date_to = _date(date_to)
+    _amount_min = _decimal(amount_min)
+    _amount_max = _decimal(amount_max)
+
+    base_where = [Document.archived == show_archived]
+    if no_type:
+        base_where.append(Document.document_type_id.is_(None))
+    if no_correspondent:
+        base_where.append(Document.correspondent_id.is_(None))
+    if search and search.strip():
+        base_where.append(Document.title.ilike(f"%{search.strip()}%"))
+    if _date_from:
+        base_where.append(Document.document_date >= _date_from)
+    if _date_to:
+        base_where.append(Document.document_date <= _date_to)
+    if _amount_min is not None:
+        base_where.append(_eur_amount >= _amount_min)
+    if _amount_max is not None:
+        base_where.append(_eur_amount <= _amount_max)
+
+    total = (await session.scalar(
+        select(func.count(Document.id))
+        .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
+        .where(*base_where)
+    )) or 0
+    total_pages = max(1, (total + _PAGE_SIZE - 1) // _PAGE_SIZE)
+    page = min(page, total_pages)
+
     stmt = (
         select(Document)
-        .options(
-            selectinload(Document.tags),
-            selectinload(Document.correspondent),
-            selectinload(Document.document_type),
-        )
+        .options(selectinload(Document.tags), selectinload(Document.correspondent), selectinload(Document.document_type))
         .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
+        .where(*base_where)
     )
-    if no_type:
-        stmt = stmt.where(Document.document_type_id.is_(None))
-    if no_correspondent:
-        stmt = stmt.where(Document.correspondent_id.is_(None))
-    if search and search.strip():
-        stmt = stmt.where(Document.title.ilike(f"%{search.strip()}%"))
     if sort == "date":
         stmt = stmt.order_by(order_fn(_SORT_COLS["date"]))
     else:
         stmt = stmt.order_by(order_fn(_SORT_COLS[sort]), sa_desc(Document.document_date))
+    stmt = stmt.offset((page - 1) * _PAGE_SIZE).limit(_PAGE_SIZE)
     docs = list((await session.execute(stmt)).scalars().all())
 
-    if no_type:
+    if show_archived:
+        back_url = "/documents?show_archived=1"
+    elif no_type:
         back_url = "/documents?no_type=1"
     elif no_correspondent:
         back_url = "/documents?no_correspondent=1"
@@ -401,18 +469,32 @@ async def documents_list(
     _filter_params: list[tuple[str, str]] = [
         ("no_type", "1" if no_type else ""),
         ("no_correspondent", "1" if no_correspondent else ""),
+        ("show_archived", "1" if show_archived else ""),
         ("search", search or ""),
+        ("date_from", date_from or ""),
+        ("date_to", date_to or ""),
+        ("amount_min", amount_min or ""),
+        ("amount_max", amount_max or ""),
     ]
 
     return templates.TemplateResponse(request, "pages/documents.html", {
         "documents": docs,
         "no_type": no_type,
         "no_correspondent": no_correspondent,
+        "show_archived": show_archived,
         "search": search or "",
+        "date_from": date_from or "",
+        "date_to": date_to or "",
+        "amount_min": amount_min or "",
+        "amount_max": amount_max or "",
+        "has_filters": any([_date_from, _date_to, _amount_min, _amount_max, search]),
         "back_url_encoded": quote(back_url, safe=""),
         "sort": sort,
         "order": order,
         "sort_base_url": _sort_base_url("/documents", _filter_params),
+        "page": page,
+        "total_pages": total_pages,
+        "total": total,
     })
 
 
@@ -509,6 +591,7 @@ async def reports(
 
     years_result = await session.execute(
         select(extract("year", Document.document_date).label("year"))
+        .where(Document.archived == False)
         .distinct()
         .order_by(extract("year", Document.document_date).desc())
     )
@@ -516,7 +599,7 @@ async def reports(
     if year is None:
         year = today.year if today.year in available_years else (available_years[0] if available_years else today.year)
 
-    _base = [extract("year", Document.document_date) == year]
+    _base = [extract("year", Document.document_date) == year, Document.archived == False]
     if quarter:
         _base.append(extract("quarter", Document.document_date) == quarter)
 
@@ -602,7 +685,7 @@ async def export_documents_csv(
     quarter: int | None = Query(default=None, ge=1, le=4),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    _base = [extract("year", Document.document_date) == year]
+    _base = [extract("year", Document.document_date) == year, Document.archived == False]
     if quarter:
         _base.append(extract("quarter", Document.document_date) == quarter)
 
@@ -652,7 +735,7 @@ async def export_bilan_csv(
     quarter: int | None = Query(default=None, ge=1, le=4),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    _base = [extract("year", Document.document_date) == year]
+    _base = [extract("year", Document.document_date) == year, Document.archived == False]
     if quarter:
         _base.append(extract("quarter", Document.document_date) == quarter)
 

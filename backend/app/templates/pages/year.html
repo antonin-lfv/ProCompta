@@ -179,9 +179,7 @@ function yearData() {
                 class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="">Tous</option>
           {% for c in correspondents %}
-            <option value="{{ c.id }}" {{ "selected" if filters.correspondent_id == c.id|string else "" }}>
-              {{ c.name }}
-            </option>
+            <option value="{{ c.id }}" {{ "selected" if filters.correspondent_id == c.id|string else "" }}>{{ c.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -191,9 +189,7 @@ function yearData() {
                 class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="">Tous</option>
           {% for dt in doc_types %}
-            <option value="{{ dt.id }}" {{ "selected" if filters.document_type_id == dt.id|string else "" }}>
-              {{ dt.name }}
-            </option>
+            <option value="{{ dt.id }}" {{ "selected" if filters.document_type_id == dt.id|string else "" }}>{{ dt.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -214,6 +210,27 @@ function yearData() {
           </a>
         {% endif %}
       </div>
+      <!-- Ligne 2 : dates + montants -->
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Date début</label>
+        <input type="date" name="date_from" value="{{ filters.date_from }}"
+               class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Date fin</label>
+        <input type="date" name="date_to" value="{{ filters.date_to }}"
+               class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Montant min (€)</label>
+        <input type="number" name="amount_min" value="{{ filters.amount_min }}" min="0" step="0.01" placeholder="0"
+               class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Montant max (€)</label>
+        <input type="number" name="amount_max" value="{{ filters.amount_max }}" min="0" step="0.01" placeholder="∞"
+               class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
     </form>
   </div>
 
@@ -225,15 +242,15 @@ function yearData() {
 
   {% macro doc_table(docs, back_year, sort, order, sort_base_url) %}
   <div class="overflow-x-auto">
-  <table class="w-full text-sm table-fixed min-w-[700px]">
+  <table class="w-full text-sm table-fixed min-w-[800px]">
     <colgroup>
       <col style="width: 30%">
       <col style="width: 110px">
       <col style="width: 18%">
       <col style="width: 14%">
-      <col style="width: 20%">
+      <col style="width: 18%">
       <col style="width: 120px">
-      <col style="width: 64px">
+      <col style="width: 100px">
     </colgroup>
     <thead>
       <tr class="border-b border-slate-200 bg-slate-50/50">
@@ -243,7 +260,7 @@ function yearData() {
         <th class="text-center text-xs font-semibold text-slate-500 px-4 py-3">Type</th>
         <th class="text-center text-xs font-semibold text-slate-500 px-4 py-3">Tags</th>
         {{ sort_th("Montant TTC", "amount", sort_base_url, sort, order, align="right", default_order="desc") }}
-        <th class="w-16"></th>
+        <th class="w-24"></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-slate-100">
@@ -253,7 +270,7 @@ function yearData() {
         <td class="px-4 py-3">
           <a href="/documents/{{ doc.id }}/edit"
              class="font-medium text-slate-800 hover:text-indigo-600 transition-colors truncate block">
-            {{ doc.title }}
+            {{ doc.title | highlight(filters.search) }}
           </a>
         </td>
         <td class="px-4 py-3 text-slate-500 whitespace-nowrap">
@@ -288,8 +305,17 @@ function yearData() {
             <span class="text-slate-400">-</span>
           {% endif %}
         </td>
-        <td class="px-4 py-3">
+        <td class="px-2 py-3">
           <div class="flex items-center justify-end gap-1">
+            <button
+              @click.stop="$dispatch('open-preview', {id: '{{ doc.id }}'})"
+              class="p-1.5 rounded-md text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+              title="Aperçu">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
             <a href="/documents/{{ doc.id }}/edit"
                class="p-1.5 rounded-md text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                title="Modifier">
@@ -359,6 +385,26 @@ function yearData() {
     </div>
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
       {{ doc_table(docs_autres, year, sort, order, sort_base_url) }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Archivés -->
+  {% if docs_archived %}
+  <div class="space-y-2">
+    <div class="flex items-center justify-between px-1">
+      <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 4.875v4.5m0-4.5-1.875 1.875M12 12.375l1.875 1.875M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+        </svg>
+        Archivés
+      </h2>
+      <span class="text-xs text-slate-400">
+        {{ docs_archived|length }} document{{ "s" if docs_archived|length != 1 else "" }} · exclus des totaux
+      </span>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden opacity-60 hover:opacity-100 transition-opacity">
+      {{ doc_table(docs_archived, year, sort, order, sort_base_url) }}
     </div>
   </div>
   {% endif %}

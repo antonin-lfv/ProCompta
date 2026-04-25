@@ -39,6 +39,7 @@ class DocumentUpdate(BaseModel):
     amount_ttc_eur: Decimal | None = None
     currency: str | None = None
     notes: str | None = None
+    archived: bool | None = None
     correspondent_id: uuid.UUID | None = None
     document_type_id: uuid.UUID | None = None
     tag_ids: list[uuid.UUID] | None = None
@@ -63,6 +64,7 @@ class DocumentResponse(BaseModel):
     amount_ttc_eur: Decimal | None
     currency: str
     notes: str | None
+    archived: bool
     correspondent_id: uuid.UUID | None
     document_type_id: uuid.UUID | None
     correspondent: CorrespondentResponse | None

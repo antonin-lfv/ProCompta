@@ -60,6 +60,7 @@ class Document(Base, UUIDMixin, TimestampMixin):
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
 
     correspondent_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("correspondents.id", ondelete="SET NULL"), nullable=True

@@ -510,17 +510,41 @@ function docEditData() {
       <!-- Section: Notes -->
       <div class="px-5 py-4 space-y-3">
         <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Notes</h2>
-        <textarea name="notes" rows="3" placeholder="Remarques, références…"
-                  class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none">{{ doc.notes or "" }}</textarea>
+        <div x-data="{ nc: {{ (doc.notes or '')|length }} }">
+          <textarea name="notes" rows="3" placeholder="Remarques, références…" maxlength="250"
+                    @input="nc = $el.value.length"
+                    class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none">{{ doc.notes or "" }}</textarea>
+          <p class="text-right text-xs text-slate-400 mt-1" :class="nc >= 240 ? 'text-amber-500' : ''">
+            <span x-text="nc"></span>/250
+          </p>
+        </div>
       </div>
 
       <!-- Actions -->
       <div class="px-5 py-4 flex items-center justify-between bg-slate-50/50">
-        <p class="text-xs text-slate-400">
-          Ajouté le {{ doc.created_at.strftime("%d/%m/%Y") if doc.created_at else "-" }}
-          · {{ (doc.file_size / 1024) | round(1) }} Ko
-          · {{ {"application/pdf": "PDF", "image/jpeg": "JPEG", "image/png": "PNG"}.get(doc.mime_type, doc.mime_type) }}
-        </p>
+        <div class="flex items-center gap-3">
+          <p class="text-xs text-slate-400">
+            Ajouté le {{ doc.created_at.strftime("%d/%m/%Y") if doc.created_at else "-" }}
+            · {{ (doc.file_size / 1024) | round(1) }} Ko
+            · {{ {"application/pdf": "PDF", "image/jpeg": "JPEG", "image/png": "PNG"}.get(doc.mime_type, doc.mime_type) }}
+          </p>
+          <button type="button"
+                  @click="fetch('/api/documents/{{ doc.id }}', {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({archived: {{ 'false' if doc.archived else 'true' }}})}).then(() => location.reload())"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors
+                         {{ 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' if doc.archived else 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200' }}">
+            {% if doc.archived %}
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m6 4.125 2.25 2.25m0 0 2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+              </svg>
+              Désarchiver
+            {% else %}
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 4.875v4.5m0-4.5-1.875 1.875M12 12.375l1.875 1.875M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+              </svg>
+              Archiver
+            {% endif %}
+          </button>
+        </div>
         <button type="submit"
                 class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">

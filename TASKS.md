@@ -1,6 +1,6 @@
 # ProCompta - Suivi des tâches
 
-## Version courante : `v0.4.0` ✅
+## Version courante : `v0.5.0` ✅
 
 ---
 
@@ -122,24 +122,19 @@
 
 ---
 
-### v0.5 - Recherche & Organisation avancée
+### ✅ Terminé - v0.5.0
 
 > Objectif : retrouver n'importe quel document en quelques secondes.
 
-#### Recherche
-- [ ] **[V5-1]** Recherche full-text dans le contenu OCR (PostgreSQL `tsvector`)
-- [ ] **[V5-2]** Barre de recherche globale dans la navbar (toutes années, toutes catégories)
-- [ ] **[V5-3]** Highlight des termes trouvés dans les résultats
-- [ ] **[V5-4]** Recherche par montant (ex : "entre 100 et 500 €")
-- [ ] **[V5-5]** Recherche par plage de dates
-
-#### Organisation
-- [ ] **[V5-6]** Archivage de documents (soft delete - masqués mais conservés)
-- [ ] **[V5-7]** Documents liés (ex : facture → avoir, facture → paiement)
-- [ ] **[V5-8]** Notes en Markdown avec preview
-- [ ] **[V5-9]** Pièces jointes multiples par document
-- [ ] **[V5-10]** Pagination sur les listes (au-delà de 100 documents)
-- [ ] **[V5-11]** Tri personnalisable sur les colonnes des tableaux (date, montant, correspondant)
+- [x] **[V5-2]** Barre de recherche globale dans la navbar (toutes années, toutes catégories)
+- [x] **[V5-3]** Highlight des termes trouvés dans les résultats
+- [x] **[V5-4]** Recherche par montant (entre X et Y €) — vue année + tous les documents
+- [x] **[V5-5]** Recherche par plage de dates — vue année + tous les documents
+- [x] **[V5-6]** Archivage de documents (soft delete) — bouton dans l'édition, section dédiée dans la vue année, exclus de tous les totaux
+- [x] **[V5-10]** Pagination sur la liste de tous les documents (50 par page)
+- [x] **[V5-11]** Tri personnalisable sur les colonnes des tableaux (date, montant, correspondant, titre)
+- [x] **[Bonus]** Aperçu modal sur chaque ligne de tableau (œil → fond flouté, infos + preview)
+- [x] **[Bonus]** Limite 250 caractères sur les notes (compteur en temps réel)
 
 ---
 
