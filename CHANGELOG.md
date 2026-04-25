@@ -1,18 +1,40 @@
 # Changelog
 
+## [0.7.0] - 2026-04-25
+
+### Ajouté
+- **Authentification** — page de login (email + mot de passe), session cookie httpOnly signée HMAC (30 jours), middleware protégeant toutes les routes (pages → redirect `/login`, API → 401 JSON)
+- **Compte admin** — créé automatiquement au premier démarrage depuis les variables `ADMIN_NAME` / `ADMIN_EMAIL` / `ADMIN_PASSWORD` du `.env`
+- **Page Profil** (`/profile`) — modification du nom et de l'email, changement de mot de passe (ancien / nouveau / confirmation), préférences (devise par défaut, mois de début d'exercice fiscal), déconnexion
+- **Backup téléchargeable** — bouton "Télécharger un backup" : génère un `.zip` (dump SQL + fichiers storage) et le télécharge directement dans le navigateur
+- **Import backup** — upload d'un `.zip`, confirmation par mot de passe, avertissement irréversible, restaure DB + storage puis redirige vers `/login`
+- **Nom dans la navbar** — icône profil cliquable + prénom affiché à droite, lien vers `/profile`
+- **Reverse proxy Caddy** — domaine local `http://procompta.local` (port 80), entrée `/etc/hosts` one-shot
+
+### Technique
+- Modèle `User` : `name`, `email` (unique), `hashed_password` (scrypt), `default_currency`, `fiscal_year_start`, `backup_path`
+- Migration Alembic `20260425_0008` — table `users`
+- `AuthMiddleware` (Starlette BaseHTTPMiddleware) — vérifie le cookie `procompta_session`, charge l'user en `request.state.user`
+- Tokens HMAC signés (stdlib uniquement : `hmac`, `hashlib`, `base64`, `json`) — aucune dépendance ajoutée
+- Helper `render()` dans `templating.py` — injecte `current_user` dans tous les templates automatiquement
+- `GET /api/backup/download` — `StreamingResponse` zip en mémoire (`io.BytesIO`)
+- `POST /api/backup/restore` — reset schema public + `psql` restore + extraction storage
+
+---
+
 ## [0.6.0] - 2026-04-25
 
 ### Ajouté
-- **Centre de notifications** — cloche dans la navbar avec badge rouge (nombre non lus), dropdown des 5 dernières notifications, fermeture en cliquant ailleurs
-- **Alerte documents incomplets** — notification créée automatiquement à l'upload ; réactivée si un document complet redevient incomplet (champ supprimé) ; marquée lue automatiquement dès que le document est complété
-- **Page Notifications** (`/notifications`) — historique complet lu/non lu, marquer comme lu, marquer comme non lu, supprimer ; synchronisation bidirectionnelle en temps réel avec la cloche navbar (événements Alpine.js window)
-- **Log d'activité** — bouton horloge dans le header de la page d'édition, ouvre un drawer latéral droit avec la timeline de toutes les modifications : upload, titre, correspondant, type, catégorie, montant + devise, date, notes, archivage/désarchivage ; icônes Heroicons par type d'événement, valeurs avant/après avec barré pour l'ancienne valeur
+- **Centre de notifications** - cloche dans la navbar avec badge rouge (nombre non lus), dropdown des 5 dernières notifications, fermeture en cliquant ailleurs
+- **Alerte documents incomplets** - notification créée automatiquement à l'upload ; réactivée si un document complet redevient incomplet (champ supprimé) ; marquée lue automatiquement dès que le document est complété
+- **Page Notifications** (`/notifications`) - historique complet lu/non lu, marquer comme lu, marquer comme non lu, supprimer ; synchronisation bidirectionnelle en temps réel avec la cloche navbar (événements Alpine.js window)
+- **Log d'activité** - bouton horloge dans le header de la page d'édition, ouvre un drawer latéral droit avec la timeline de toutes les modifications : upload, titre, correspondant, type, catégorie, montant + devise, date, notes, archivage/désarchivage ; icônes Heroicons par type d'événement, valeurs avant/après avec barré pour l'ancienne valeur
 ### Technique
 - Modèle `Notification` (`notifications` table) : `type`, `document_id` (FK CASCADE), `title`, `body`, `read`
 - Modèle `DocumentActivity` (`document_activity` table) : `document_id` (FK CASCADE), `event_type` (enum), `old_value`, `new_value`, `created_at` ; indexes sur `document_id` et `created_at`
 - Router `/api/notifications` : `GET /`, `GET /unread-count`, `PATCH /read-all`, `PATCH /{id}/read`, `PATCH /{id}/unread`, `DELETE /{id}`
-- Endpoint `GET /api/documents/{id}/activity` — retourne la liste des événements triée chronologiquement
-- Migrations Alembic `20260425_0006` (notifications) et `20260425_0007` (document_activity) — pattern `DO $$ BEGIN CREATE TYPE ... EXCEPTION WHEN duplicate_object THEN NULL; END $$` pour les enums PostgreSQL
+- Endpoint `GET /api/documents/{id}/activity` - retourne la liste des événements triée chronologiquement
+- Migrations Alembic `20260425_0006` (notifications) et `20260425_0007` (document_activity) - pattern `DO $$ BEGIN CREATE TYPE ... EXCEPTION WHEN duplicate_object THEN NULL; END $$` pour les enums PostgreSQL
 - Déduplication des notifications : réactivation de la notification existante (lue ou non lue) plutôt que création d'un doublon
 - Alpine.js plain-object reactivity (`readMap`/`deletedMap`) à la place de `Set` (non intercepté par Proxy Alpine)
 - Données JSON en `<script>` tag pour éviter les conflits de guillemets dans les attributs `x-data`
@@ -22,21 +44,21 @@
 ## [0.5.0] - 2026-04-25
 
 ### Ajouté
-- **Recherche globale** — barre de recherche dans la navbar, redirige vers `/documents?search=…`
-- **Highlight des résultats** — filtre Jinja2 `highlight` : les termes cherchés sont surlignés en jaune dans les titres
-- **Tri des colonnes** — macro `sort_th` : clic sur Titre / Date / Correspondant / Montant TTC dans les tableaux, flèche d'indication, ordre persisté dans l'URL
-- **Filtre par plage de dates** — champs `date_from` / `date_to` dans les formulaires de filtres (vue année + tous les documents)
-- **Filtre par montant** — champs `amount_min` / `amount_max` (EUR) dans les mêmes formulaires
-- **Archivage** — bouton "Archiver / Désarchiver" dans la page d'édition (PATCH JSON) ; documents archivés exclus de tous les totaux (dashboard, vue année, rapports, exports) ; section "Archivés" en bas de la vue année ; vue transversale `/documents?show_archived=1`
-- **Pagination** — 50 documents par page sur `/documents`, avec contrôles prev/next + numéros, filtres et tri préservés
-- **Aperçu modal** — bouton œil sur chaque ligne : overlay fond flouté, preview du fichier (iframe PDF / img), toutes les métadonnées, lien "Modifier"
-- **Limite notes** — 250 caractères max sur les notes, compteur temps réel avec alerte amber à 240
+- **Recherche globale** - barre de recherche dans la navbar, redirige vers `/documents?search=…`
+- **Highlight des résultats** - filtre Jinja2 `highlight` : les termes cherchés sont surlignés en jaune dans les titres
+- **Tri des colonnes** - macro `sort_th` : clic sur Titre / Date / Correspondant / Montant TTC dans les tableaux, flèche d'indication, ordre persisté dans l'URL
+- **Filtre par plage de dates** - champs `date_from` / `date_to` dans les formulaires de filtres (vue année + tous les documents)
+- **Filtre par montant** - champs `amount_min` / `amount_max` (EUR) dans les mêmes formulaires
+- **Archivage** - bouton "Archiver / Désarchiver" dans la page d'édition (PATCH JSON) ; documents archivés exclus de tous les totaux (dashboard, vue année, rapports, exports) ; section "Archivés" en bas de la vue année ; vue transversale `/documents?show_archived=1`
+- **Pagination** - 50 documents par page sur `/documents`, avec contrôles prev/next + numéros, filtres et tri préservés
+- **Aperçu modal** - bouton œil sur chaque ligne : overlay fond flouté, preview du fichier (iframe PDF / img), toutes les métadonnées, lien "Modifier"
+- **Limite notes** - 250 caractères max sur les notes, compteur temps réel avec alerte amber à 240
 
 ### Technique
 - Filtre Jinja2 `highlight(text, search)` dans `templating.py` (markupsafe, regex IGNORECASE)
-- `sort_th` macro dans `macros.html` — paramètres `col`, `default_order`, `align`
+- `sort_th` macro dans `macros.html` - paramètres `col`, `default_order`, `align`
 - `_sort_base_url()` helper préservant tous les filtres actifs dans les URLs de tri
-- Migration Alembic `20260425_0005` — colonne `archived BOOLEAN NOT NULL DEFAULT false`
+- Migration Alembic `20260425_0005` - colonne `archived BOOLEAN NOT NULL DEFAULT false`
 - `Document.archived == False` ajouté systématiquement dans dashboard, years_list, reports, exports, available_years
 - `_PAGE_SIZE = 50` dans `documents_list`, count query séparé pour la pagination
 

@@ -128,9 +128,9 @@
 
 - [x] **[V5-2]** Barre de recherche globale dans la navbar (toutes années, toutes catégories)
 - [x] **[V5-3]** Highlight des termes trouvés dans les résultats
-- [x] **[V5-4]** Recherche par montant (entre X et Y €) — vue année + tous les documents
-- [x] **[V5-5]** Recherche par plage de dates — vue année + tous les documents
-- [x] **[V5-6]** Archivage de documents (soft delete) — bouton dans l'édition, section dédiée dans la vue année, exclus de tous les totaux
+- [x] **[V5-4]** Recherche par montant (entre X et Y €) - vue année + tous les documents
+- [x] **[V5-5]** Recherche par plage de dates - vue année + tous les documents
+- [x] **[V5-6]** Archivage de documents (soft delete) - bouton dans l'édition, section dédiée dans la vue année, exclus de tous les totaux
 - [x] **[V5-10]** Pagination sur la liste de tous les documents (50 par page)
 - [x] **[V5-11]** Tri personnalisable sur les colonnes des tableaux (date, montant, correspondant, titre)
 - [x] **[Bonus]** Aperçu modal sur chaque ligne de tableau (œil → fond flouté, infos + preview)
@@ -144,37 +144,40 @@
 
 #### Notifications
 - [x] **[V6-1]** Centre de notifications in-app (cloche navbar, badge rouge, dropdown 5 dernières)
-- [x] **[V6-3]** Alerte documents importés non complétés — créée à l'upload, réactivée si le doc redevient incomplet, résolue automatiquement quand complété
-- [x] **[V6-4]** Historique des notifications (`/notifications`) — lu/non lu, marquer non lu, supprimer, sync bidirectionnelle navbar ↔ page
-- ~~**[V6-2]**~~ Rappel de paiement — écarté (non pertinent)
+- [x] **[V6-3]** Alerte documents importés non complétés - créée à l'upload, réactivée si le doc redevient incomplet, résolue automatiquement quand complété
+- [x] **[V6-4]** Historique des notifications (`/notifications`) - lu/non lu, marquer non lu, supprimer, sync bidirectionnelle navbar ↔ page
+- ~~**[V6-2]**~~ Rappel de paiement - écarté (non pertinent)
 
 #### Workflow
-- ~~**[V6-5]**~~ Statut de document — écarté (non pertinent pour usage solo)
-- ~~**[V6-6]**~~ Page "À traiter" — écartée (non pertinent pour usage solo)
-- ~~**[V6-7]**~~ Mode révision rapide — écarté (non pertinent pour usage solo)
-- ~~**[V6-8]**~~ Commentaires internes — écarté (redondant avec le champ notes)
-- [x] **[V6-9]** Log d'activité par document — timeline dans un drawer latéral (upload, titre, correspondant, type, catégorie, montant, date, notes, archivage)
+- ~~**[V6-5]**~~ Statut de document - écarté (non pertinent pour usage solo)
+- ~~**[V6-6]**~~ Page "À traiter" - écartée (non pertinent pour usage solo)
+- ~~**[V6-7]**~~ Mode révision rapide - écarté (non pertinent pour usage solo)
+- ~~**[V6-8]**~~ Commentaires internes - écarté (redondant avec le champ notes)
+- [x] **[V6-9]** Log d'activité par document - timeline dans un drawer latéral (upload, titre, correspondant, type, catégorie, montant, date, notes, archivage)
 
 ---
 
-### v0.7 - Profil & Authentification
+### ✅ Terminé - v0.7.0
 
 > Objectif : sécuriser l'accès et personnaliser l'expérience.
 
 #### Authentification
-- [ ] **[V7-1]** Page de login (email + mot de passe, local)
-- [ ] **[V7-2]** Session avec cookie sécurisé (httpOnly)
-- [ ] **[V7-3]** Page de changement de mot de passe
-- [ ] **[V7-4]** Protection de toutes les routes (middleware auth)
+- [x] **[V7-1]** Page de login (email + mot de passe, local)
+- [x] **[V7-2]** Session avec cookie sécurisé (httpOnly, 30 jours, signé HMAC)
+- [x] **[V7-3]** Page de changement de mot de passe (ancien / nouveau / confirmation)
+- [x] **[V7-4]** Protection de toutes les routes (middleware — pages → redirect /login, API → 401 JSON)
 
 #### Profil utilisateur
-- [ ] **[V7-5]** Page profil (`/profile`) - nom, email, avatar
-- [ ] **[V7-6]** Préférences : devise par défaut, début d'exercice fiscal
-- [ ] **[V7-7]** Option multi-utilisateurs avec rôles (admin / lecteur)
+- [x] **[V7-5]** Page profil (`/profile`) — nom, email, déconnexion
+- [x] **[V7-6]** Préférences : devise par défaut, premier mois de l'exercice fiscal
+- ~~**[V7-7]**~~ Multi-utilisateurs — écarté (usage solo)
 
 #### Backup
-- [ ] **[V7-8]** Bouton "Backup" dans la page profil — déclenche `POST /api/backup`, affiche le nom et le poids du fichier généré
-- [ ] **[V7-9]** Champ chemin de sauvegarde (à gauche du bouton backup) — permet de configurer le dossier de destination des backups (défaut : `backups/` à la racine du projet)
+- [x] **[V7-8]** Bouton "Télécharger un backup" dans la page profil — `GET /api/backup/download`, téléchargement direct du zip dans le navigateur
+- [x] **[V7-9]** Import backup — mot de passe requis, avertissement irréversible, restaure DB + storage, redirige vers /login
+
+#### Infrastructure
+- [x] **[V7-10]** Reverse proxy Caddy — domaine local `http://procompta.local` (port 80), entrée `/etc/hosts` one-shot
 
 ---
 

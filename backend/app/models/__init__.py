@@ -5,5 +5,6 @@ from app.models.document_activity import DocumentActivity
 from app.models.document_type import DocumentType
 from app.models.notification import Notification
 from app.models.tag import Tag
+from app.models.user import User
 
-__all__ = ["Base", "Correspondent", "Document", "document_tags", "DocumentActivity", "DocumentType", "Notification", "Tag"]
+__all__ = ["Base", "Correspondent", "Document", "document_tags", "DocumentActivity", "DocumentType", "Notification", "Tag", "User"]

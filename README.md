@@ -31,12 +31,18 @@ cp .env.example .env
 
 ```env
 POSTGRES_USER=procompta
-POSTGRES_PASSWORD=changeme          # à changer en production
+POSTGRES_PASSWORD=changeme
 POSTGRES_DB=procompta
 DATABASE_URL=postgresql+asyncpg://procompta:changeme@db:5432/procompta
-STORAGE_PATH=/absolute/path/to/ProCompta/storage   # chemin local vers le dossier storage
-API_PORT=8000
+STORAGE_PATH=/absolute/path/to/ProCompta/storage
+
+SECRET_KEY=une-clé-secrète-longue-et-aléatoire
+ADMIN_NAME=Ton Prénom
+ADMIN_EMAIL=toi@example.com
+ADMIN_PASSWORD=ton-mot-de-passe
 ```
+
+> `ADMIN_*` sert uniquement à créer le compte au **premier démarrage**. Pour modifier ensuite email, nom ou mot de passe, utilise la page `/profile`.
 
 ### 3. Démarrer les services
 
@@ -52,11 +58,23 @@ Les services démarrent dans cet ordre : `db` → `api` (grâce aux healthchecks
 docker compose exec api uv run alembic upgrade head
 ```
 
-### 5. Ouvrir l'application
+### 5. Configurer le domaine local (one-shot)
+
+ProCompta est accessible via `http://procompta.local` grâce à Caddy (reverse proxy inclus dans Docker Compose). Il faut indiquer une fois à macOS que ce nom de domaine pointe vers la machine locale :
+
+```bash
+sudo sh -c 'echo "127.0.0.1 procompta.local" >> /etc/hosts'
+```
+
+> Cette commande ajoute une ligne au fichier `/etc/hosts`. Elle ne s'exécute qu'une seule fois et survit aux redémarrages.
+
+### 6. Ouvrir l'application
 
 ```
-http://localhost:8000
+http://procompta.local
 ```
+
+Connecte-toi avec les identifiants définis dans ton `.env` (`ADMIN_EMAIL` / `ADMIN_PASSWORD`).
 
 ---
 
@@ -118,6 +136,7 @@ ProCompta/
 | Frontend | Jinja2, Tailwind CSS, Alpine.js, HTMX |
 | Previews | pdf2image + Poppler, Pillow |
 | Packaging | uv |
+| Reverse proxy | Caddy |
 | Infrastructure | Docker Compose |
 
 ---

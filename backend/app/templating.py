@@ -2,6 +2,8 @@ import re
 from datetime import date
 from pathlib import Path
 
+from fastapi import Request
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
@@ -32,6 +34,11 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.filters["date_fr"] = _date_fr
 templates.env.filters["highlight"] = _highlight
 templates.env.globals.update({
-    "app_version": "0.6.0",
+    "app_version": "0.7.0",
     "current_year": date.today().year,
 })
+
+
+def render(request: Request, template: str, ctx: dict | None = None) -> HTMLResponse:
+    user = getattr(request.state, "user", None)
+    return templates.TemplateResponse(request, template, {"current_user": user, **(ctx or {})})

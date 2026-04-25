@@ -69,13 +69,13 @@ async def _sync_notification(doc: Document, session: AsyncSession) -> None:
             )
             if existing:
                 existing.read = False
-                existing.title = f"« {doc.title} » — informations manquantes"
+                existing.title = f"« {doc.title} » - informations manquantes"
                 existing.body = _missing_body(doc)
             else:
                 session.add(Notification(
                     type=NotificationTypeEnum.incomplete_document,
                     document_id=doc.id,
-                    title=f"« {doc.title} » — informations manquantes",
+                    title=f"« {doc.title} » - informations manquantes",
                     body=_missing_body(doc),
                 ))
     await session.commit()
@@ -179,7 +179,7 @@ async def upload_document(
     session.add(Notification(
         type=NotificationTypeEnum.incomplete_document,
         document_id=document_id,
-        title=f"« {stem} » importé — à compléter",
+        title=f"« {stem} » importé - à compléter",
         body="Sans correspondant · Sans type",
     ))
     session.add(DocumentActivity(

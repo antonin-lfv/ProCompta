@@ -9,5 +9,10 @@ class Settings(BaseSettings):
     backup_path: str = "/app/backups"
     api_port: int = 8000
 
+    secret_key: str = "change-me-in-production"
+    admin_name: str = "Admin"
+    admin_email: str = "admin@procompta.local"
+    admin_password: str = "changeme"
+
 
 settings = Settings()

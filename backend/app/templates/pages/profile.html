@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Profil{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-2xl mx-auto space-y-6">
+
+  <h1 class="text-xl font-semibold text-slate-800">Profil</h1>
+
+  <!-- Alertes -->
+  {% if success == 'identity' %}
+  <div class="px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">Identité mise à jour.</div>
+  {% elif success == 'password' %}
+  <div class="px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">Mot de passe modifié.</div>
+  {% elif success == 'preferences' %}
+  <div class="px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">Préférences enregistrées.</div>
+  {% endif %}
+  {% if error == 'wrong_password' %}
+  <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">Mot de passe actuel incorrect.</div>
+  {% elif error == 'password_mismatch' %}
+  <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">Les mots de passe ne correspondent pas.</div>
+  {% elif error == 'password_too_short' %}
+  <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">Le mot de passe doit faire au moins 8 caractères.</div>
+  {% endif %}
+
+  <!-- Identité -->
+  <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+    <div class="px-6 py-4">
+      <h2 class="text-sm font-semibold text-slate-700">Identité</h2>
+    </div>
+    <form method="POST" action="/profile/identity" class="px-6 py-5 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Nom</label>
+          <input type="text" name="name" value="{{ user.name }}" required
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Email</label>
+          <input type="email" name="email" value="{{ user.email }}" required
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+        </div>
+      </div>
+      <div class="flex justify-end">
+        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+          Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Mot de passe -->
+  <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+    <div class="px-6 py-4">
+      <h2 class="text-sm font-semibold text-slate-700">Mot de passe</h2>
+    </div>
+    <form method="POST" action="/profile/password" class="px-6 py-5 space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1.5">Mot de passe actuel</label>
+        <input type="password" name="old_password" required
+               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Nouveau mot de passe</label>
+          <input type="password" name="new_password" required minlength="8"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Confirmation</label>
+          <input type="password" name="confirm_password" required minlength="8"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+        </div>
+      </div>
+      <div class="flex justify-end">
+        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+          Changer le mot de passe
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Préférences -->
+  <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+    <div class="px-6 py-4">
+      <h2 class="text-sm font-semibold text-slate-700">Préférences</h2>
+    </div>
+    <form method="POST" action="/profile/preferences" class="px-6 py-5 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Devise par défaut</label>
+          <select name="default_currency"
+                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+            {% for c in currencies %}
+            <option value="{{ c }}" {% if user.default_currency == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Début de l'exercice fiscal</label>
+          <select name="fiscal_year_start"
+                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+            {% for m in months %}
+            <option value="{{ loop.index }}" {% if user.fiscal_year_start == loop.index %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end">
+        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+          Enregistrer
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Backup -->
+  <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100"
+       x-data="{
+         showImport: false,
+         importFile: null,
+         importPassword: '',
+         importLoading: false,
+         importError: null,
+         async runRestore() {
+           if (!this.importFile) return;
+           this.importLoading = true; this.importError = null;
+           const fd = new FormData();
+           fd.append('file', this.importFile);
+           fd.append('password', this.importPassword);
+           try {
+             const r = await fetch('/api/backup/restore', {method: 'POST', body: fd});
+             const d = await r.json();
+             if (!r.ok) { this.importError = d.detail || 'Erreur'; return; }
+             window.location.href = '/login';
+           } catch(e) { this.importError = e.message; }
+           finally { this.importLoading = false; }
+         }
+       }">
+    <div class="px-6 py-4">
+      <h2 class="text-sm font-semibold text-slate-700">Backup</h2>
+    </div>
+    <div class="px-6 py-5 space-y-5">
+
+      <!-- Boutons -->
+      <div class="flex items-center gap-3">
+        <a href="/api/backup/download"
+           class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+          Télécharger un backup
+        </a>
+        <button @click="showImport = !showImport"
+                class="flex items-center gap-2 px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          Importer une backup
+        </button>
+      </div>
+
+      <!-- Panel import -->
+      <div x-show="showImport" x-cloak class="border border-amber-200 bg-amber-50 rounded-xl p-5 space-y-4">
+        <div class="flex items-start gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-amber-500 shrink-0 mt-0.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <div>
+            <p class="text-sm font-semibold text-amber-800">Attention - opération irréversible</p>
+            <p class="text-xs text-amber-700 mt-0.5">Toutes les données actuelles (documents, correspondants, tags, notifications…) seront remplacées par le contenu du backup. Confirmez votre mot de passe pour continuer.</p>
+          </div>
+        </div>
+
+        <div x-show="importError" class="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700" x-text="importError"></div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Fichier backup (.zip)</label>
+          <input type="file" accept=".zip" @change="importFile = $event.target.files[0]"
+                 class="w-full text-sm text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 transition">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Mot de passe de confirmation</label>
+          <input type="password" x-model="importPassword" placeholder="Votre mot de passe actuel"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+        </div>
+        <div class="flex items-center gap-3">
+          <button @click="runRestore()" :disabled="importLoading || !importFile || !importPassword"
+                  class="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+            <span x-text="importLoading ? 'Restauration…' : 'Confirmer et restaurer'"></span>
+          </button>
+          <button @click="showImport = false; importPassword = ''; importError = null"
+                  class="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg transition-colors">
+            Annuler
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Déconnexion -->
+  <div class="flex justify-end pb-6">
+    <form method="POST" action="/logout">
+      <button type="submit" class="flex items-center gap-2 px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-600 text-sm font-medium rounded-lg transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+        </svg>
+        Se déconnecter
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

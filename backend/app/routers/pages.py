@@ -23,7 +23,7 @@ from app.models.document_type import DocumentType
 from app.models.tag import Tag
 from app.services.file_service import delete_file, rename_file
 from app.services.preview_service import delete_preview
-from app.templating import templates
+from app.templating import render, templates
 from app.utils import slugify
 
 router = APIRouter(tags=["pages"])
@@ -137,13 +137,13 @@ async def _sync_notification_pages(doc: Document, session: AsyncSession) -> None
             )
             if existing:
                 existing.read = False
-                existing.title = f"« {doc.title} » — informations manquantes"
+                existing.title = f"« {doc.title} » - informations manquantes"
                 existing.body = _missing_body(doc)
             else:
                 session.add(Notification(
                     type=NotificationTypeEnum.incomplete_document,
                     document_id=doc.id,
-                    title=f"« {doc.title} » — informations manquantes",
+                    title=f"« {doc.title} » - informations manquantes",
                     body=_missing_body(doc),
                 ))
     await session.commit()
@@ -270,7 +270,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         .limit(5)
     )
 
-    return templates.TemplateResponse(request, "pages/dashboard.html", {
+    return render(request, "pages/dashboard.html", {
         "now": today,
         "current_year": today.year,
         "total_depenses": total_depenses,
@@ -313,7 +313,7 @@ async def years_list(request: Request, session: AsyncSession = Depends(get_sessi
         .group_by(extract("year", Document.document_date))
         .order_by(extract("year", Document.document_date).desc())
     )
-    return templates.TemplateResponse(request, "pages/years.html", {"years_data": result.all()})
+    return render(request, "pages/years.html", {"years_data": result.all()})
 
 
 # ── Vue année ─────────────────────────────────────────────────────────────────
@@ -424,7 +424,7 @@ async def year_view(
         *[("tag_ids", str(t)) for t in tag_uuids],
     ]
 
-    return templates.TemplateResponse(request, "pages/year.html", {
+    return render(request, "pages/year.html", {
         "year": year,
         "documents": docs,
         "docs_depenses": docs_depenses,
@@ -546,7 +546,7 @@ async def documents_list(
         ("amount_max", amount_max or ""),
     ]
 
-    return templates.TemplateResponse(request, "pages/documents.html", {
+    return render(request, "pages/documents.html", {
         "documents": docs,
         "no_type": no_type,
         "no_correspondent": no_correspondent,
@@ -579,7 +579,7 @@ async def document_edit(
     doc = await _doc_or_404(session, id)
     back_url = back if back and back.startswith("/") else f"/year/{doc.document_date.year}"
     all_tags_list = await _tags(session)
-    return templates.TemplateResponse(request, "pages/document_edit.html", {
+    return render(request, "pages/document_edit.html", {
         "doc": doc,
         "back_url": back_url,
         "correspondents": await _correspondents(session),
@@ -783,7 +783,7 @@ async def reports(
         for name, data in sorted(_corr_pivot.items(), key=lambda x: x[0].lower())
     ]
 
-    return templates.TemplateResponse(request, "pages/reports.html", {
+    return render(request, "pages/reports.html", {
         "year": year,
         "quarter": quarter,
         "period_label": period_label,
@@ -902,7 +902,7 @@ async def notifications_page(request: Request, session: AsyncSession = Depends(g
     )
     notifications = list(result.scalars().all())
     unread_count = sum(1 for n in notifications if not n.read)
-    return templates.TemplateResponse(request, "pages/notifications.html", {
+    return render(request, "pages/notifications.html", {
         "notifications": notifications,
         "unread_count": unread_count,
         "notification_ids_json": json.dumps([str(n.id) for n in notifications]),
@@ -914,7 +914,7 @@ async def notifications_page(request: Request, session: AsyncSession = Depends(g
 
 @router.get("/config", response_class=HTMLResponse)
 async def config(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
-    return templates.TemplateResponse(request, "pages/config.html", {
+    return render(request, "pages/config.html", {
         "correspondents": await _correspondents(session),
         "doc_types": await _doc_types(session),
         "tags": await _tags(session),

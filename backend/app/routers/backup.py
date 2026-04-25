@@ -1,12 +1,20 @@
+import io
+import shutil
 import subprocess
 import zipfile
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.database import get_session
+from app.dependencies import get_current_user
+from app.models.user import User
+from app.services.auth_service import verify_password
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -23,33 +31,89 @@ def _parse_db_url() -> dict:
     }
 
 
-@router.post("")
-async def create_backup() -> dict:
-    db = _parse_db_url()
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"procompta_backup_{timestamp}.zip"
-    backup_dir = Path(settings.backup_path)
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    zip_path = backup_dir / filename
+def _psql_env(db: dict) -> dict:
+    return {"PGPASSWORD": db["password"], "PATH": "/usr/bin:/bin:/usr/lib/postgresql/16/bin"}
 
-    # pg_dump
+
+@router.get("/download")
+async def download_backup(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    db = _parse_db_url()
+
     result = subprocess.run(
-        ["pg_dump", "-h", db["host"], "-p", db["port"], "-U", db["user"], db["dbname"]],
+        ["pg_dump", "--clean", "--if-exists", "-h", db["host"], "-p", db["port"], "-U", db["user"], db["dbname"]],
         capture_output=True,
-        env={"PGPASSWORD": db["password"], "PATH": "/usr/bin:/bin"},
+        env=_psql_env(db),
         timeout=120,
     )
     if result.returncode != 0:
         raise HTTPException(status_code=500, detail=f"pg_dump failed: {result.stderr.decode()}")
 
-    sql_dump = result.stdout
-
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("database.sql", sql_dump)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("database.sql", result.stdout)
         storage = Path(settings.storage_path)
         for file in storage.rglob("*"):
             if file.is_file():
                 zf.write(file, arcname=f"storage/{file.relative_to(storage)}")
+    buf.seek(0)
 
-    size_mb = round(zip_path.stat().st_size / 1_048_576, 2)
-    return {"filename": filename, "size_mb": size_mb}
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"procompta_backup_{timestamp}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/restore")
+async def restore_backup(
+    request: Request,
+    file: UploadFile = File(...),
+    password: str = Form(...),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    if not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=403, detail="Mot de passe incorrect")
+
+    content = await file.read()
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(content))
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Fichier zip invalide")
+
+    if "database.sql" not in zf.namelist():
+        raise HTTPException(status_code=400, detail="Archive invalide (database.sql manquant)")
+
+    sql_dump = zf.read("database.sql")
+    db = _parse_db_url()
+    env = _psql_env(db)
+    psql_base = ["psql", "-h", db["host"], "-p", db["port"], "-U", db["user"], db["dbname"]]
+
+    clean = subprocess.run(
+        psql_base + ["-c", f"DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO {db['user']};"],
+        capture_output=True, env=env, timeout=30,
+    )
+    if clean.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"Schema reset failed: {clean.stderr.decode()}")
+
+    restore = subprocess.run(
+        psql_base, input=sql_dump, capture_output=True, env=env, timeout=120,
+    )
+    if restore.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"Restore failed: {restore.stderr.decode()}")
+
+    storage = Path(settings.storage_path)
+    for name in zf.namelist():
+        if name.startswith("storage/") and not name.endswith("/"):
+            rel = name[len("storage/"):]
+            target = storage / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(zf.read(name))
+
+    zf.close()
+    return {"status": "ok"}

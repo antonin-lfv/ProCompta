@@ -46,7 +46,7 @@ async def migrate() -> None:
             await session.commit()
             print(f"\n✓ {migrated} fichier(s) migré(s), {skipped} déjà à jour.")
         else:
-            print(f"Rien à migrer — {skipped} fichier(s) déjà à jour.")
+            print(f"Rien à migrer - {skipped} fichier(s) déjà à jour.")
 
     await engine.dispose()
 

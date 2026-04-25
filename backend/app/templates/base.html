@@ -63,8 +63,8 @@
       open: false,
       loading: false,
       doc: null,
-      fmt(n) { return n != null ? Number(n).toFixed(2) + ' €' : '—'; },
-      fmtDate(d) { if (!d) return '—'; const p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; },
+      fmt(n) { return n != null ? Number(n).toFixed(2) + ' €' : '-'; },
+      fmtDate(d) { if (!d) return '-'; const p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; },
       fmtSize(b) {
         if (b < 1024) return b + ' o';
         if (b < 1048576) return (b/1024).toFixed(0) + ' Ko';
