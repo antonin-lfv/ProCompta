@@ -330,13 +330,26 @@ async def year_view(
     docs_recettes = [d for d in docs if d.category == CategoryEnum.recette]
     docs_autres   = [d for d in docs if d.category == CategoryEnum.autre]
 
-    archived_result = await session.execute(
+    archived_stmt = (
         select(Document)
         .options(selectinload(Document.tags), selectinload(Document.correspondent), selectinload(Document.document_type))
+        .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
         .where(extract("year", Document.document_date) == year, Document.archived == True)
-        .order_by(Document.document_date.desc())
     )
-    docs_archived = list(archived_result.scalars().all())
+    if corr_uuid:
+        archived_stmt = archived_stmt.where(Document.correspondent_id == corr_uuid)
+    if search and search.strip():
+        archived_stmt = archived_stmt.where(Document.title.ilike(f"%{search.strip()}%"))
+    if _date_from:
+        archived_stmt = archived_stmt.where(Document.document_date >= _date_from)
+    if _date_to:
+        archived_stmt = archived_stmt.where(Document.document_date <= _date_to)
+    if _amount_min is not None:
+        archived_stmt = archived_stmt.where(_eur_amount >= _amount_min)
+    if _amount_max is not None:
+        archived_stmt = archived_stmt.where(_eur_amount <= _amount_max)
+    archived_stmt = archived_stmt.order_by(Document.document_date.desc())
+    docs_archived = list((await session.execute(archived_stmt)).scalars().all())
 
     def _eur(d: Document) -> Decimal:
         return (d.amount_ttc if d.currency == "EUR" else d.amount_ttc_eur) or Decimal("0")
@@ -457,14 +470,17 @@ async def documents_list(
     stmt = stmt.offset((page - 1) * _PAGE_SIZE).limit(_PAGE_SIZE)
     docs = list((await session.execute(stmt)).scalars().all())
 
-    if show_archived:
-        back_url = "/documents?show_archived=1"
-    elif no_type:
-        back_url = "/documents?no_type=1"
-    elif no_correspondent:
-        back_url = "/documents?no_correspondent=1"
-    else:
-        back_url = "/documents"
+    back_params = [(k, v) for k, v in [
+        ("no_type", "1" if no_type else ""),
+        ("no_correspondent", "1" if no_correspondent else ""),
+        ("show_archived", "1" if show_archived else ""),
+        ("search", search or ""),
+        ("date_from", date_from or ""),
+        ("date_to", date_to or ""),
+        ("amount_min", amount_min or ""),
+        ("amount_max", amount_max or ""),
+    ] if v]
+    back_url = "/documents" + ("?" + urlencode(back_params) if back_params else "")
 
     _filter_params: list[tuple[str, str]] = [
         ("no_type", "1" if no_type else ""),
@@ -545,7 +561,7 @@ async def document_update_form(
     doc.amount_ttc = None if is_autre else _decimal(str(form.get("amount_ttc", "")))
     doc.currency = str(form.get("currency", "EUR")).strip() or "EUR"
     doc.amount_ttc_eur = None if (is_autre or doc.currency == "EUR") else _decimal(str(form.get("amount_ttc_eur", "")))
-    doc.notes = str(form.get("notes", "")).strip() or None
+    doc.notes = str(form.get("notes", "")).strip()[:250] or None
     doc.correspondent_id = _uuid(str(form.get("correspondent_id", "")))
     doc.document_type_id = _uuid(str(form.get("document_type_id", "")))
 
