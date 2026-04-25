@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import badge, empty_state, sort_th %}
+{% from "partials/macros.html" import badge, empty_state, sort_th, tooltip %}
 
 {% block title %}Année {{ year }}{% endblock %}
 
@@ -62,6 +62,7 @@ function yearData() {
   @dragover.window.prevent="if(!uploading) dragOver = true"
   @dragleave.window="if(!$event.relatedTarget) dragOver = false"
   @drop.window.prevent="dragOver = false; handleDrop($event)"
+  @trigger-upload.window="$el.querySelector('input[type=file]')?.click()"
 >
 
   <!-- Drag-and-drop overlay (visuel uniquement, événements gérés au niveau window) -->
@@ -111,7 +112,8 @@ function yearData() {
         </svg>
         Bilan
       </a>
-      <label class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white cursor-pointer hover:bg-indigo-700 transition-colors">
+      <label class="relative group inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white cursor-pointer hover:bg-indigo-700 transition-colors">
+        {{ tooltip("Importer un PDF, JPEG ou PNG", "bottom") }}
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
         </svg>

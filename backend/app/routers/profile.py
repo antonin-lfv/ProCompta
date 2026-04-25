@@ -1,9 +1,14 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_session
 from app.dependencies import get_current_user
+from app.models.document import Document
 from app.models.user import User
 from app.services.auth_service import hash_password, verify_password
 from app.templating import render
@@ -91,3 +96,24 @@ async def update_preferences(
         pass
     await session.commit()
     return RedirectResponse("/profile?success=preferences", status_code=303)
+
+
+@router.post("/profile/purge-previews")
+async def purge_previews(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    previews_dir = Path(settings.storage_path) / "previews"
+    if not previews_dir.exists():
+        return {"deleted": 0}
+
+    result = await session.execute(select(Document.id))
+    existing_ids = {str(id_) for id_ in result.scalars().all()}
+
+    deleted = 0
+    for f in previews_dir.glob("*.png"):
+        if f.stem not in existing_ids:
+            f.unlink(missing_ok=True)
+            deleted += 1
+
+    return {"deleted": deleted}

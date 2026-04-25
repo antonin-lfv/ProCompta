@@ -39,3 +39,6 @@ backups/*
 
 # Logs
 *.log
+
+# Tailwind CSS build output
+backend/app/static/css/tailwind.css

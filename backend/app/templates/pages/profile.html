@@ -198,6 +198,31 @@
     </div>
   </div>
 
+  <!-- Maintenance -->
+  <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100"
+       x-data="{ purging: false, purgeResult: null }">
+    <div class="px-6 py-4">
+      <h2 class="text-sm font-semibold text-slate-700">Maintenance</h2>
+    </div>
+    <div class="px-6 py-5 space-y-3">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <p class="text-sm font-medium text-slate-700">Previews orphelines</p>
+          <p class="text-xs text-slate-500 mt-0.5">Supprime les fichiers de preview sans document associé.</p>
+        </div>
+        <button
+          @click="purging=true; purgeResult=null; fetch('/profile/purge-previews', {method:'POST'}).then(r=>r.json()).then(d=>{purgeResult=d.deleted; purging=false}).catch(()=>purging=false)"
+          :disabled="purging"
+          class="shrink-0 px-3 py-1.5 text-sm font-medium border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg transition-colors">
+          <span x-text="purging ? 'Nettoyage…' : 'Purger'"></span>
+        </button>
+      </div>
+      <div x-show="purgeResult !== null" x-cloak
+           class="px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700"
+           x-text="purgeResult + (purgeResult === 1 ? ' preview orpheline supprimée.' : ' previews orphelines supprimées.')"></div>
+    </div>
+  </div>
+
   <!-- Déconnexion -->
   <div class="flex justify-end pb-6">
     <form method="POST" action="/logout">

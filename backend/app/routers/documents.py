@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import extract, select
 from sqlalchemy.exc import IntegrityError
@@ -268,18 +268,25 @@ async def update_document(
 
 
 @router.get("/{id}/file")
-async def get_document_file(id: uuid.UUID, session: AsyncSession = Depends(get_session)):
-    from fastapi.responses import FileResponse
+async def get_document_file(id: uuid.UUID, request: Request, session: AsyncSession = Depends(get_session)):
+    from fastapi.responses import FileResponse, Response
     doc = await session.get(Document, id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     path = Path(settings.storage_path) / doc.file_path
     if not path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable")
+    etag = f'"{doc.file_hash}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304)
     return FileResponse(
         path,
         media_type=doc.mime_type,
-        headers={"Content-Disposition": f'inline; filename="{path.name}"'},
+        headers={
+            "Content-Disposition": f'inline; filename="{path.name}"',
+            "ETag": etag,
+            "Cache-Control": "private, max-age=31536000, immutable",
+        },
     )
 
 

@@ -37,6 +37,10 @@
 </div>
 {% endmacro %}
 
+{% macro tooltip(text, position='top') %}
+<span class="pointer-events-none absolute {% if position == 'top' %}bottom-full left-1/2 -translate-x-1/2 mb-1.5{% else %}top-full left-1/2 -translate-x-1/2 mt-1.5{% endif %} whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 z-50">{{ text }}</span>
+{% endmacro %}
+
 {% macro sort_th(label, col, sort_base_url, current_sort, current_order, align="left", default_order="asc") %}
 {% set is_active = current_sort == col %}
 {% if is_active %}

@@ -1,139 +1,92 @@
 # ProCompta
 
-Gestionnaire de documents comptables - local, simple, sans abonnement.
-Organisez vos factures, reçus et relevés par année, correspondant et tags.
+Gestionnaire de documents comptables — local, sans abonnement, sans cloud.
+
+Organisez vos factures, relevés et reçus par année, correspondant et catégorie. Suivez vos dépenses et recettes, exportez vos bilans, gérez vos devises étrangères.
 
 ---
 
 ## Prérequis
 
-- [Docker](https://docs.docker.com/get-docker/) + [Docker Compose](https://docs.docker.com/compose/) (v2)
-- Git
+- [Docker Desktop](https://docs.docker.com/get-docker/) (inclut Docker Compose v2)
+- macOS (testé) · Linux compatible
 
 ---
 
-## Lancer le projet
-
-### 1. Cloner le dépôt
+## Installation
 
 ```bash
 git clone <url-du-repo>
 cd ProCompta
+./setup.sh
 ```
 
-### 2. Configurer l'environnement
+Le script s'occupe de tout :
 
-```bash
-cp .env.example .env
-```
+- demande ton prénom, e-mail et mot de passe
+- génère automatiquement `SECRET_KEY` et le mot de passe PostgreSQL
+- crée les dossiers `storage/` et `backups/`
+- configure le domaine local `http://procompta.local` (optionnel, nécessite sudo)
+- build les images Docker et applique les migrations
 
-Éditer `.env` et adapter si besoin :
-
-```env
-POSTGRES_USER=procompta
-POSTGRES_PASSWORD=changeme
-POSTGRES_DB=procompta
-DATABASE_URL=postgresql+asyncpg://procompta:changeme@db:5432/procompta
-STORAGE_PATH=/absolute/path/to/ProCompta/storage
-
-SECRET_KEY=une-clé-secrète-longue-et-aléatoire
-ADMIN_NAME=Ton Prénom
-ADMIN_EMAIL=toi@example.com
-ADMIN_PASSWORD=ton-mot-de-passe
-```
-
-> `ADMIN_*` sert uniquement à créer le compte au **premier démarrage**. Pour modifier ensuite email, nom ou mot de passe, utilise la page `/profile`.
-
-### 3. Démarrer les services
-
-```bash
-docker compose up --build -d
-```
-
-Les services démarrent dans cet ordre : `db` → `api` (grâce aux healthchecks).
-
-### 4. Appliquer les migrations
-
-```bash
-docker compose exec api uv run alembic upgrade head
-```
-
-### 5. Configurer le domaine local (one-shot)
-
-ProCompta est accessible via `http://procompta.local` grâce à Caddy (reverse proxy inclus dans Docker Compose). Il faut indiquer une fois à macOS que ce nom de domaine pointe vers la machine locale :
-
-```bash
-sudo sh -c 'echo "127.0.0.1 procompta.local" >> /etc/hosts'
-```
-
-> Cette commande ajoute une ligne au fichier `/etc/hosts`. Elle ne s'exécute qu'une seule fois et survit aux redémarrages.
-
-### 6. Ouvrir l'application
-
-```
-http://procompta.local
-```
-
-Connecte-toi avec les identifiants définis dans ton `.env` (`ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+À la fin, l'URL et tes identifiants s'affichent dans le terminal.
 
 ---
 
-## Commandes utiles
+## Utilisation quotidienne
 
 ```bash
-# Voir les logs en temps réel
-docker compose logs -f api
+# Démarrer
+docker compose up -d
 
-# Arrêter les services
+# Arrêter
 docker compose down
 
-# Arrêter et supprimer les volumes (reset complet de la base)
+# Logs en temps réel
+docker compose logs -f api
+
+# Reset complet (supprime la base de données)
 docker compose down -v
-
-# Créer une nouvelle migration après modification des modèles
-docker compose exec api uv run alembic revision --autogenerate -m "description"
-
-# Appliquer les migrations
-docker compose exec api uv run alembic upgrade head
 ```
 
 ---
 
-## Structure du projet
+## Fonctionnalités
 
-```
-ProCompta/
-├── docker-compose.yml
-├── .env.example
-├── storage/                  # Fichiers et previews (volume Docker)
-│   ├── documents/
-│   └── previews/
-└── backend/
-    ├── Dockerfile
-    ├── pyproject.toml
-    ├── alembic.ini
-    ├── alembic/
-    └── app/
-        ├── main.py
-        ├── config.py
-        ├── database.py
-        ├── models/
-        ├── schemas/
-        ├── routers/
-        ├── services/
-        └── templates/
-```
+| Catégorie | Détail |
+|-----------|--------|
+| **Documents** | Upload PDF / JPEG / PNG, preview intégrée, détection de doublons |
+| **Organisation** | Catégories (dépense / recette / autre), types, correspondants, tags colorés |
+| **Finances** | Montants HT / TVA / TTC, multi-devises (6 devises, conversion BCE automatique) |
+| **Vues** | Tableau de bord, vue par année, tous les documents, rapports trimestriels |
+| **Recherche** | Recherche globale, filtres date / montant / correspondant, tri des colonnes |
+| **Exports** | CSV bilan comptable, CSV liste des documents |
+| **Workflow** | Archivage, log d'activité par document, notifications documents incomplets |
+| **Sécurité** | Authentification par e-mail + mot de passe, session 30 jours (HMAC) |
+| **Backup** | Téléchargement zip (dump SQL + fichiers), restauration avec confirmation |
+| **Ergonomie** | Raccourcis clavier (`/` recherche · `N` nouveau · `?` aide), tooltips |
+
+---
+
+## Raccourcis clavier
+
+| Touche | Action |
+|--------|--------|
+| `/` | Focus la barre de recherche |
+| `N` | Nouveau document (import fichier) |
+| `?` | Afficher l'aide des raccourcis |
+| `Esc` | Fermer les modales |
 
 ---
 
 ## Stack
 
 | Couche | Technologie |
-|---|---|
-| Backend | Python 3.13, FastAPI, SQLAlchemy (async) |
+|--------|-------------|
+| Backend | Python 3.13, FastAPI, SQLAlchemy async |
 | Base de données | PostgreSQL 16 |
 | Migrations | Alembic |
-| Frontend | Jinja2, Tailwind CSS, Alpine.js, HTMX |
+| Frontend | Jinja2, Tailwind CSS 3 (build CLI), Alpine.js, HTMX |
 | Previews | pdf2image + Poppler, Pillow |
 | Packaging | uv |
 | Reverse proxy | Caddy |
@@ -141,22 +94,40 @@ ProCompta/
 
 ---
 
-## Formats supportés
+## Structure
 
-| Format | Upload | Preview |
-|---|---|---|
-| PDF | ✓ | ✓ |
-| JPEG | ✓ | ✓ |
-| PNG | ✓ | ✓ |
+```
+ProCompta/
+├── setup.sh                  # Installation en une commande
+├── docker-compose.yml
+├── Caddyfile
+├── .env.example
+├── storage/                  # Fichiers uploadés (bind mount Docker)
+│   └── previews/
+├── backups/                  # Backups téléchargés depuis le profil
+└── backend/
+    ├── Dockerfile
+    ├── entrypoint.sh         # Build Tailwind CSS + démarrage uvicorn
+    ├── tailwind.config.js
+    ├── pyproject.toml
+    └── app/
+        ├── models/
+        ├── routers/
+        ├── services/
+        └── templates/
+```
 
 ---
 
-## Roadmap
+## Commandes utiles
 
-| Version | Fonctionnalité |
-|---|---|
-| v0.2 | OCR / extraction automatique des métadonnées |
-| v0.3 | Export comptable CSV |
-| v0.4 | Recherche full-text |
-| v0.5 | Authentification multi-utilisateurs |
-| v1.0 | Thème sombre |
+```bash
+# Appliquer de nouvelles migrations après modification des modèles
+docker compose exec api uv run alembic upgrade head
+
+# Créer une migration
+docker compose exec api uv run alembic revision --autogenerate -m "description"
+
+# Reconstruire après changement de dépendances
+docker compose up --build -d
+```

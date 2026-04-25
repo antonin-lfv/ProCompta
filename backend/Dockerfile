@@ -13,6 +13,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get update && apt-get install -y --no-install-recommends postgresql-client-16 \
   && rm -rf /var/lib/apt/lists/*
 
+# Tailwind CSS standalone CLI (pas de Node.js nécessaire)
+RUN curl -sL https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.17/tailwindcss-linux-x64 \
+    -o /usr/local/bin/tailwindcss \
+  && chmod +x /usr/local/bin/tailwindcss
+
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PYTHON_DOWNLOADS=auto
@@ -29,4 +34,6 @@ RUN uv sync --frozen --no-dev
 
 RUN mkdir -p /app/storage/documents /app/storage/previews
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]

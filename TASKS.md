@@ -1,6 +1,6 @@
 # ProCompta - Suivi des tâches
 
-## Version courante : `v0.6.0` ✅
+## Version courante : `v1.0.0` ✅
 
 ---
 
@@ -181,27 +181,36 @@
 
 ---
 
-### v1.0 - Production Ready
+### ✅ Terminé - v0.8.0
 
-> Objectif : une application polie, rapide et agréable au quotidien.
+> Objectif : ergonomie clavier + nettoyage du stockage.
 
-#### UI / UX
-- [ ] **[V8-1]** Thème sombre (toggle navbar, préférence persistée)
-- [ ] **[V8-2]** Interface entièrement responsive (mobile + tablette)
-- [ ] **[V8-3]** Raccourcis clavier globaux (`N` = nouveau document, `/` = recherche, `?` = aide)
-- [ ] **[V8-4]** Onboarding - wizard au premier lancement
-- [ ] **[V8-5]** Aide contextuelle inline (tooltips)
+- [x] **[V8-3]** Raccourcis clavier globaux (`/` = recherche, `N` = nouveau document, `?` = aide)
+- [x] **[V8-12]** Purge des previews orphelines (bouton dans Profil > Maintenance)
 
-#### Performance
-- [ ] **[V8-6]** Remplacement du CDN Tailwind par build CLI (purgé, <10 KB)
-- [ ] **[V8-7]** Mise en cache des previews (ETags, Cache-Control)
-- [ ] **[V8-8]** Scroll infini sur les listes longues
-- [ ] **[V8-9]** Lazy loading des previews
+---
 
-#### Données
-- [ ] **[V8-10]** Export complet backup (ZIP : documents + métadonnées JSON)
-- [ ] **[V8-11]** Import depuis un backup
-- [ ] **[V8-12]** Purge des previews orphelines
+### ✅ Terminé - v0.9.0
+
+> Objectif : performance — zéro CDN Tailwind, cache HTTP des fichiers.
+
+- [x] **[V8-6]** Remplacement du CDN Tailwind par build CLI (binaire standalone v3.4.17, purgé au `docker build`)
+- [x] **[V8-7]** ETags + Cache-Control sur `GET /api/documents/{id}/file` (hash SHA-256 comme ETag, 304 si inchangé)
+- [x] **[V8-9]** Lazy loading sur l'image de la modale de preview
+
+---
+
+### ✅ Terminé - v1.0.0
+
+> Objectif : tooltips d'aide + finalisation production.
+
+- [x] **[V8-5]** Tooltips stylisés sur les boutons action (édition, archivage, import, raccourci `/`)
+- [x] **[V8-1]** Thème sombre — écarté pour l'instant
+- [x] **[V8-2]** Responsive — écarté (usage Docker desktop uniquement)
+- [x] **[V8-4]** Onboarding — écarté (usage solo)
+- [x] **[V8-8]** Scroll infini — écarté (pagination suffisante)
+- [x] **[V8-10]** Export backup — fait en v0.7.0
+- [x] **[V8-11]** Import backup — fait en v0.7.0
 
 ---
 
