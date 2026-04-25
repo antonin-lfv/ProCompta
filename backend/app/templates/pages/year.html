@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import badge, empty_state %}
+{% from "partials/macros.html" import badge, empty_state, sort_th %}
 
 {% block title %}Année {{ year }}{% endblock %}
 
@@ -223,7 +223,7 @@ function yearData() {
     </div>
   {% endif %}
 
-  {% macro doc_table(docs, back_year) %}
+  {% macro doc_table(docs, back_year, sort, order, sort_base_url) %}
   <div class="overflow-x-auto">
   <table class="w-full text-sm table-fixed min-w-[700px]">
     <colgroup>
@@ -237,12 +237,12 @@ function yearData() {
     </colgroup>
     <thead>
       <tr class="border-b border-slate-200 bg-slate-50/50">
-        <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Titre</th>
-        <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Date</th>
-        <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Correspondant</th>
+        {{ sort_th("Titre", "title", sort_base_url, sort, order, align="left", default_order="asc") }}
+        {{ sort_th("Date", "date", sort_base_url, sort, order, align="left", default_order="desc") }}
+        {{ sort_th("Correspondant", "correspondent", sort_base_url, sort, order, align="left", default_order="asc") }}
         <th class="text-center text-xs font-semibold text-slate-500 px-4 py-3">Type</th>
         <th class="text-center text-xs font-semibold text-slate-500 px-4 py-3">Tags</th>
-        <th class="text-right text-xs font-semibold text-slate-500 px-4 py-3">Montant TTC</th>
+        {{ sort_th("Montant TTC", "amount", sort_base_url, sort, order, align="right", default_order="desc") }}
         <th class="w-16"></th>
       </tr>
     </thead>
@@ -327,7 +327,7 @@ function yearData() {
       </span>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      {{ doc_table(docs_depenses, year) }}
+      {{ doc_table(docs_depenses, year, sort, order, sort_base_url) }}
     </div>
   </div>
   {% endif %}
@@ -343,7 +343,7 @@ function yearData() {
       </span>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      {{ doc_table(docs_recettes, year) }}
+      {{ doc_table(docs_recettes, year, sort, order, sort_base_url) }}
     </div>
   </div>
   {% endif %}
@@ -358,7 +358,7 @@ function yearData() {
       </span>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      {{ doc_table(docs_autres, year) }}
+      {{ doc_table(docs_autres, year, sort, order, sort_base_url) }}
     </div>
   </div>
   {% endif %}

@@ -4,11 +4,11 @@ import uuid
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
-from sqlalchemy import case, extract, func, select
+from sqlalchemy import asc as sa_asc, case, desc as sa_desc, extract, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -94,6 +94,19 @@ _eur_amount = case(
 
 _CAT_LABELS = {"depense": "Dépenses", "recette": "Recettes", "autre": "Autres"}
 _CAT_ORDER  = {"depense": 0, "recette": 1, "autre": 2}
+
+
+_SORT_COLS: dict[str, object] = {
+    "date":          Document.document_date,
+    "title":         Document.title,
+    "amount":        _eur_amount,
+    "correspondent": Correspondent.name,
+}
+
+
+def _sort_base_url(path: str, params: list[tuple[str, str]]) -> str:
+    qs = urlencode([(k, v) for k, v in params if v])
+    return path + "?" + (qs + "&" if qs else "")
 
 
 def _variation(current: Decimal, prev: Decimal, *, higher_is_better: bool = True) -> dict | None:
@@ -257,15 +270,24 @@ async def year_view(
     document_type_id: str | None = Query(default=None),
     tag_ids: list[str] = Query(default=[]),
     search: str | None = Query(default=None),
+    sort: str = Query(default="date"),
+    order: str = Query(default="desc"),
     session: AsyncSession = Depends(get_session),
 ) -> HTMLResponse:
     corr_uuid = _uuid(correspondent_id)
     dtype_uuid = _uuid(document_type_id)
     tag_uuids = [u for s in tag_ids if (u := _uuid(s))]
 
+    if sort not in _SORT_COLS:
+        sort = "date"
+    if order not in ("asc", "desc"):
+        order = "desc"
+    order_fn = sa_desc if order == "desc" else sa_asc
+
     stmt = (
         select(Document)
         .options(selectinload(Document.tags), selectinload(Document.correspondent), selectinload(Document.document_type))
+        .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
         .where(extract("year", Document.document_date) == year)
     )
     if corr_uuid:
@@ -278,7 +300,10 @@ async def year_view(
         stmt = stmt.where(Document.id.in_(
             select(document_tags.c.document_id).where(document_tags.c.tag_id == tid)
         ))
-    stmt = stmt.order_by(Document.document_date.desc())
+    if sort == "date":
+        stmt = stmt.order_by(order_fn(_SORT_COLS["date"]))
+    else:
+        stmt = stmt.order_by(order_fn(_SORT_COLS[sort]), sa_desc(Document.document_date))
 
     docs = list((await session.execute(stmt)).scalars().all())
 
@@ -294,6 +319,13 @@ async def year_view(
     has_foreign_currency = any(
         d.currency != "EUR" and not d.amount_ttc_eur for d in docs
     )
+
+    _filter_params: list[tuple[str, str]] = [
+        ("correspondent_id", str(corr_uuid) if corr_uuid else ""),
+        ("document_type_id", str(dtype_uuid) if dtype_uuid else ""),
+        ("search", search or ""),
+        *[("tag_ids", str(t)) for t in tag_uuids],
+    ]
 
     return templates.TemplateResponse(request, "pages/year.html", {
         "year": year,
@@ -314,6 +346,9 @@ async def year_view(
             "search": search or "",
         },
         "has_filters": any([corr_uuid, dtype_uuid, tag_uuids, search]),
+        "sort": sort,
+        "order": order,
+        "sort_base_url": _sort_base_url(f"/year/{year}", _filter_params),
     })
 
 
@@ -325,8 +360,16 @@ async def documents_list(
     no_type: bool = Query(default=False),
     no_correspondent: bool = Query(default=False),
     search: str | None = Query(default=None),
+    sort: str = Query(default="date"),
+    order: str = Query(default="desc"),
     session: AsyncSession = Depends(get_session),
 ) -> HTMLResponse:
+    if sort not in _SORT_COLS:
+        sort = "date"
+    if order not in ("asc", "desc"):
+        order = "desc"
+    order_fn = sa_desc if order == "desc" else sa_asc
+
     stmt = (
         select(Document)
         .options(
@@ -334,6 +377,7 @@ async def documents_list(
             selectinload(Document.correspondent),
             selectinload(Document.document_type),
         )
+        .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
     )
     if no_type:
         stmt = stmt.where(Document.document_type_id.is_(None))
@@ -341,7 +385,10 @@ async def documents_list(
         stmt = stmt.where(Document.correspondent_id.is_(None))
     if search and search.strip():
         stmt = stmt.where(Document.title.ilike(f"%{search.strip()}%"))
-    stmt = stmt.order_by(Document.document_date.desc(), Document.created_at.desc())
+    if sort == "date":
+        stmt = stmt.order_by(order_fn(_SORT_COLS["date"]))
+    else:
+        stmt = stmt.order_by(order_fn(_SORT_COLS[sort]), sa_desc(Document.document_date))
     docs = list((await session.execute(stmt)).scalars().all())
 
     if no_type:
@@ -351,12 +398,21 @@ async def documents_list(
     else:
         back_url = "/documents"
 
+    _filter_params: list[tuple[str, str]] = [
+        ("no_type", "1" if no_type else ""),
+        ("no_correspondent", "1" if no_correspondent else ""),
+        ("search", search or ""),
+    ]
+
     return templates.TemplateResponse(request, "pages/documents.html", {
         "documents": docs,
         "no_type": no_type,
         "no_correspondent": no_correspondent,
         "search": search or "",
         "back_url_encoded": quote(back_url, safe=""),
+        "sort": sort,
+        "order": order,
+        "sort_base_url": _sort_base_url("/documents", _filter_params),
     })
 
 

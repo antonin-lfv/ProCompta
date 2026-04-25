@@ -1,13 +1,21 @@
 <header class="h-14 bg-slate-900 border-b border-slate-700/50 flex items-center justify-between px-6 shrink-0 z-10">
 
-  <a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-    <div class="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-      <span class="text-white text-xs font-bold leading-none">PC</span>
-    </div>
-    <span class="font-semibold text-white text-sm">ProCompta</span>
+  <a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0">
+    <img src="/static/logo.png" alt="ProCompta" class="h-10 w-auto object-contain">
   </a>
 
-  <div class="flex items-center gap-1">
+  <form action="/documents" method="GET" class="flex-1 max-w-sm mx-8">
+    <div class="relative">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+           class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+      </svg>
+      <input type="text" name="search" placeholder="Rechercher un document…"
+             class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors">
+    </div>
+  </form>
+
+  <div class="flex items-center gap-1 shrink-0">
     <button
       title="Notifications"
       class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
