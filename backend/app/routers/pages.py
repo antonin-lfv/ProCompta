@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import uuid
 from collections import defaultdict
 from datetime import date
@@ -16,6 +17,8 @@ from sqlalchemy.orm import selectinload
 from app.database import get_session
 from app.models.correspondent import Correspondent
 from app.models.document import CategoryEnum, Document, document_tags
+from app.models.document_activity import ActivityEventEnum, DocumentActivity
+from app.models.notification import Notification, NotificationTypeEnum
 from app.models.document_type import DocumentType
 from app.models.tag import Tag
 from app.services.file_service import delete_file
@@ -94,6 +97,56 @@ _eur_amount = case(
 
 _CAT_LABELS = {"depense": "Dépenses", "recette": "Recettes", "autre": "Autres"}
 _CAT_ORDER  = {"depense": 0, "recette": 1, "autre": 2}
+
+
+def _is_complete(doc: Document) -> bool:
+    return bool(
+        doc.document_type_id
+        and doc.correspondent_id
+        and (doc.category == CategoryEnum.autre or doc.amount_ttc)
+    )
+
+
+def _missing_body(doc: Document) -> str:
+    missing = []
+    if not doc.correspondent_id:
+        missing.append("correspondant")
+    if not doc.document_type_id:
+        missing.append("type")
+    if doc.category != CategoryEnum.autre and not doc.amount_ttc:
+        missing.append("montant")
+    return "Sans " + " · sans ".join(missing) if missing else "Informations incomplètes"
+
+
+async def _sync_notification_pages(doc: Document, session: AsyncSession) -> None:
+    unread_result = await session.execute(
+        select(Notification).where(Notification.document_id == doc.id, Notification.read == False)
+    )
+    unread = list(unread_result.scalars().all())
+
+    if _is_complete(doc):
+        for n in unread:
+            n.read = True
+    else:
+        if not unread:
+            existing = await session.scalar(
+                select(Notification)
+                .where(Notification.document_id == doc.id)
+                .order_by(Notification.created_at.desc())
+                .limit(1)
+            )
+            if existing:
+                existing.read = False
+                existing.title = f"« {doc.title} » — informations manquantes"
+                existing.body = _missing_body(doc)
+            else:
+                session.add(Notification(
+                    type=NotificationTypeEnum.incomplete_document,
+                    document_id=doc.id,
+                    title=f"« {doc.title} » — informations manquantes",
+                    body=_missing_body(doc),
+                ))
+    await session.commit()
 
 
 _SORT_COLS: dict[str, object] = {
@@ -544,6 +597,15 @@ async def document_update_form(
     doc = await _doc_or_404(session, id)
     form = await request.form()
 
+    # Capture old state for activity log
+    old_title = doc.title
+    old_corr_name = doc.correspondent.name if doc.correspondent else None
+    old_type_name = doc.document_type.name if doc.document_type else None
+    old_category = doc.category.value
+    old_amount = f"{doc.amount_ttc} {doc.currency}" if doc.amount_ttc else None
+    old_date = doc.document_date.isoformat() if doc.document_date else None
+    old_notes = doc.notes
+
     if title := str(form.get("title", "")).strip():
         doc.title = title
     if doc_date := _date(str(form.get("document_date", ""))):
@@ -573,6 +635,34 @@ async def document_update_form(
         doc.tags = []
 
     await session.commit()
+
+    # Resolve new correspondent / type names after commit
+    new_corr_name = (await session.get(Correspondent, doc.correspondent_id)).name if doc.correspondent_id else None
+    new_type_name = (await session.get(DocumentType, doc.document_type_id)).name if doc.document_type_id else None
+    new_amount = f"{doc.amount_ttc} {doc.currency}" if doc.amount_ttc else None
+    new_date = doc.document_date.isoformat() if doc.document_date else None
+
+    activities: list[DocumentActivity] = []
+    if doc.title != old_title:
+        activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.title_changed, old_value=old_title, new_value=doc.title))
+    if new_corr_name != old_corr_name:
+        activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.correspondent_changed, old_value=old_corr_name, new_value=new_corr_name))
+    if new_type_name != old_type_name:
+        activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.type_changed, old_value=old_type_name, new_value=new_type_name))
+    if doc.category.value != old_category:
+        activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.category_changed, old_value=old_category, new_value=doc.category.value))
+    if new_amount != old_amount:
+        activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.amount_changed, old_value=old_amount, new_value=new_amount))
+    if new_date != old_date:
+        activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.date_changed, old_value=old_date, new_value=new_date))
+    if doc.notes != old_notes:
+        activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.notes_changed))
+    if activities:
+        for a in activities:
+            session.add(a)
+        await session.commit()
+
+    await _sync_notification_pages(doc, session)
     back = str(form.get("back", "")).strip()
     redirect_url = back if back and back.startswith("/") else f"/year/{doc.document_date.year}"
     return RedirectResponse(redirect_url, status_code=303)
@@ -793,6 +883,23 @@ async def export_bilan_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="procompta_{year}{suffix}_bilan.csv"'},
     )
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+@router.get("/notifications", response_class=HTMLResponse)
+async def notifications_page(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
+    result = await session.execute(
+        select(Notification).order_by(Notification.created_at.desc()).limit(200)
+    )
+    notifications = list(result.scalars().all())
+    unread_count = sum(1 for n in notifications if not n.read)
+    return templates.TemplateResponse(request, "pages/notifications.html", {
+        "notifications": notifications,
+        "unread_count": unread_count,
+        "notification_ids_json": json.dumps([str(n.id) for n in notifications]),
+        "read_ids_json": json.dumps([str(n.id) for n in notifications if n.read]),
+    })
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────

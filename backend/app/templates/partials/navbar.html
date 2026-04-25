@@ -16,14 +16,121 @@
   </form>
 
   <div class="flex items-center gap-1 shrink-0">
-    <button
-      title="Notifications"
-      class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-      </svg>
-    </button>
+
+    <!-- Bell -->
+    <div x-data="{
+      open: false,
+      count: 0,
+      items: [],
+      loaded: false,
+      async init() {
+        await this.fetchCount();
+      },
+      async fetchCount() {
+        try {
+          const r = await fetch('/api/notifications/unread-count');
+          this.count = (await r.json()).count;
+        } catch(e) {}
+      },
+      async fetchItems() {
+        try {
+          const r = await fetch('/api/notifications?read=false&limit=5');
+          this.items = await r.json();
+          this.loaded = true;
+        } catch(e) {}
+      },
+      async toggle() {
+        this.open = !this.open;
+        if (this.open && !this.loaded) await this.fetchItems();
+      },
+      _dispatch(action, id) {
+        window.dispatchEvent(new CustomEvent('notif-changed', {detail: {action, id}}));
+      },
+      async openDoc(n) {
+        if (!n.read) {
+          await fetch('/api/notifications/' + n.id + '/read', {method:'PATCH'});
+          this._dispatch('read', n.id);
+        }
+        window.location.href = '/documents/' + n.document_id + '/edit?back=/notifications';
+      },
+      async markRead(n) {
+        await fetch('/api/notifications/' + n.id + '/read', {method:'PATCH'});
+        this._dispatch('read', n.id);
+      },
+      async markAll() {
+        await fetch('/api/notifications/read-all', {method:'PATCH'});
+        this._dispatch('read-all', null);
+      },
+      async onNotifChanged(detail) {
+        await this.fetchCount();
+        if (!this.loaded) return;
+        if (!detail) { this.loaded = false; this.items = []; return; }
+        const {action, id} = detail;
+        if ((action === 'read' || action === 'delete') && id) {
+          this.items = this.items.filter(i => i.id !== id);
+        } else if (action === 'read-all') {
+          this.items = [];
+        } else if (action === 'unread') {
+          await this.fetchItems();
+        }
+      }
+    }" @click.outside="open = false" @notif-changed.window="onNotifChanged($event.detail)" class="relative">
+
+      <button @click="toggle()"
+              class="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+        </svg>
+        <span x-show="count > 0" x-text="count > 9 ? '9+' : count"
+              class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 leading-none">
+        </span>
+      </button>
+
+      <!-- Dropdown -->
+      <div x-show="open" x-cloak
+           class="absolute right-0 top-full mt-1 w-80 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50">
+
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+          <span class="text-sm font-semibold text-slate-800">Notifications</span>
+          <button x-show="count > 0" @click="markAll()"
+                  class="text-xs text-indigo-600 hover:text-indigo-800 transition-colors">
+            Tout marquer lu
+          </button>
+        </div>
+
+        <div class="max-h-72 overflow-y-auto divide-y divide-slate-100">
+          <template x-if="items.length === 0">
+            <div class="px-4 py-6 text-center text-sm text-slate-400">
+              Aucune notification non lue
+            </div>
+          </template>
+          <template x-for="n in items" :key="n.id">
+            <div class="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+              <span class="mt-1.5 w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-slate-700 font-medium leading-tight" x-text="n.title"></p>
+                <p class="text-xs text-slate-400 mt-0.5" x-text="n.body"></p>
+                <div class="flex items-center gap-3 mt-1.5">
+                  <button x-show="n.document_id" @click="openDoc(n)"
+                          class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                    Ouvrir →
+                  </button>
+                  <button @click="markRead(n)" class="text-xs text-slate-400 hover:text-slate-600">
+                    Marquer lu
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="border-t border-slate-100 px-4 py-2.5">
+          <a href="/notifications" class="text-xs text-slate-500 hover:text-slate-700 transition-colors">
+            Voir tout l'historique →
+          </a>
+        </div>
+      </div>
+    </div>
 
     <button
       title="Profil"

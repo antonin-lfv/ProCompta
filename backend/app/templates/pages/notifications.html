@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications · ProCompta{% endblock %}
+
+{% block content %}
+
+<script>
+  const _notifAllIds = {{ notification_ids_json | safe }};
+  const _notifReadIds = {{ read_ids_json | safe }};
+</script>
+
+<div class="p-6 space-y-6 max-w-3xl mx-auto"
+     x-data="{
+       items: _notifAllIds.slice(),
+       readMap: Object.fromEntries(_notifReadIds.map(id => [id, true])),
+       deletedMap: {},
+       isRead(id) { return id in this.readMap; },
+       isDeleted(id) { return id in this.deletedMap; },
+       unreadCount() { return this.items.filter(id => !(id in this.readMap) && !(id in this.deletedMap)).length; },
+       _dispatch(action, id) {
+         window.dispatchEvent(new CustomEvent('notif-changed', {detail: {action, id}}));
+       },
+       async markRead(id) {
+         await fetch('/api/notifications/' + id + '/read', {method: 'PATCH'});
+         this.readMap = {...this.readMap, [id]: true};
+         this._dispatch('read', id);
+       },
+       async markUnread(id) {
+         await fetch('/api/notifications/' + id + '/unread', {method: 'PATCH'});
+         const m = {...this.readMap}; delete m[id]; this.readMap = m;
+         this._dispatch('unread', id);
+       },
+       async markAll() {
+         await fetch('/api/notifications/read-all', {method: 'PATCH'});
+         this.readMap = Object.fromEntries(this.items.map(id => [id, true]));
+         this._dispatch('read-all', null);
+       },
+       async deleteNotif(id) {
+         await fetch('/api/notifications/' + id, {method: 'DELETE'});
+         this.deletedMap = {...this.deletedMap, [id]: true};
+         this._dispatch('delete', id);
+       },
+       onNotifChanged(detail) {
+         if (!detail) return;
+         const {action, id} = detail;
+         if (action === 'read' && id) {
+           this.readMap = {...this.readMap, [id]: true};
+         } else if (action === 'unread' && id) {
+           const m = {...this.readMap}; delete m[id]; this.readMap = m;
+         } else if (action === 'delete' && id) {
+           this.deletedMap = {...this.deletedMap, [id]: true};
+         } else if (action === 'read-all') {
+           this.readMap = Object.fromEntries(this.items.map(id => [id, true]));
+         }
+       }
+     }"
+     @notif-changed.window="onNotifChanged($event.detail)">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <h1 class="text-2xl font-bold text-slate-900">Notifications</h1>
+      <span x-show="unreadCount() > 0"
+            x-text="unreadCount() + ' non lue' + (unreadCount() > 1 ? 's' : '')"
+            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+      </span>
+    </div>
+    <button x-show="unreadCount() > 0" @click="markAll()"
+            class="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+      Tout marquer comme lu
+    </button>
+  </div>
+
+  <!-- Liste -->
+  {% if notifications %}
+  <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+    {% for notif in notifications %}
+    {% set nid = notif.id | string %}
+    <div x-show="!isDeleted('{{ nid }}')"
+         class="flex items-start gap-4 px-5 py-4 transition-colors"
+         :class="isRead('{{ nid }}') ? 'bg-white' : 'bg-indigo-50/40'">
+
+      <!-- Indicateur -->
+      <div class="mt-1.5 shrink-0">
+        <span class="block w-2.5 h-2.5 rounded-full transition-colors"
+              :class="isRead('{{ nid }}') ? 'bg-slate-200' : 'bg-indigo-500'">
+        </span>
+      </div>
+
+      <!-- Contenu -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-sm font-medium leading-tight transition-colors"
+               :class="isRead('{{ nid }}') ? 'text-slate-400' : 'text-slate-800'">
+              {{ notif.title }}
+            </p>
+            {% if notif.body %}
+            <p class="text-xs text-slate-400 mt-0.5">{{ notif.body }}</p>
+            {% endif %}
+          </div>
+          <span class="text-xs text-slate-400 shrink-0 mt-0.5">
+            {{ notif.created_at.strftime('%d/%m/%Y %H:%M') }}
+          </span>
+        </div>
+
+        <div class="flex items-center gap-4 mt-2">
+          {% if notif.document_id %}
+          <a href="/documents/{{ notif.document_id }}/edit?back=/notifications"
+             @click="markRead('{{ nid }}')"
+             class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
+            Ouvrir le document →
+          </a>
+          {% endif %}
+          <button x-show="!isRead('{{ nid }}')"
+                  @click="markRead('{{ nid }}')"
+                  class="text-xs text-slate-400 hover:text-slate-600 transition-colors">
+            Marquer comme lu
+          </button>
+          <button x-show="isRead('{{ nid }}')"
+                  @click="markUnread('{{ nid }}')"
+                  class="text-xs text-slate-400 hover:text-slate-600 transition-colors">
+            Marquer comme non lu
+          </button>
+          <button @click="deleteNotif('{{ nid }}')"
+                  class="text-xs text-red-400 hover:text-red-600 transition-colors ml-auto">
+            Supprimer
+          </button>
+        </div>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="bg-white rounded-xl border border-slate-200 px-6 py-12 text-center">
+    <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-slate-400">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+      </svg>
+    </div>
+    <p class="text-sm font-medium text-slate-700">Aucune notification</p>
+    <p class="text-sm text-slate-400 mt-1">Vous êtes à jour.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

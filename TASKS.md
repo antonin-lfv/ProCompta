@@ -1,6 +1,6 @@
 # ProCompta - Suivi des tâches
 
-## Version courante : `v0.5.0` ✅
+## Version courante : `v0.6.0` ✅
 
 ---
 
@@ -138,22 +138,22 @@
 
 ---
 
-### v0.6 - Notifications & Workflow
+### ✅ Terminé - v0.6.0
 
-> Objectif : ne plus rater une échéance ou un document à traiter.
+> Objectif : ne plus rater un document à traiter.
 
 #### Notifications
-- [ ] **[V6-1]** Centre de notifications in-app (cloche navbar, badge rouge)
-- [ ] **[V6-2]** Rappel de paiement - alerte J-3 avant `payment_date` sur les dépenses
-- [ ] **[V6-3]** Alerte documents importés non complétés (sans catégorie, sans correspondant, sans montant)
-- [ ] **[V6-4]** Historique des notifications (lu / non lu)
+- [x] **[V6-1]** Centre de notifications in-app (cloche navbar, badge rouge, dropdown 5 dernières)
+- [x] **[V6-3]** Alerte documents importés non complétés — créée à l'upload, réactivée si le doc redevient incomplet, résolue automatiquement quand complété
+- [x] **[V6-4]** Historique des notifications (`/notifications`) — lu/non lu, marquer non lu, supprimer, sync bidirectionnelle navbar ↔ page
+- ~~**[V6-2]**~~ Rappel de paiement — écarté (non pertinent)
 
 #### Workflow
-- [ ] **[V6-5]** Statut de document : `brouillon → à valider → validé`
-- [ ] **[V6-6]** Page "À traiter" - file des documents importés sans métadonnées complètes
-- [ ] **[V6-7]** Mode révision rapide : navigation clavier entre documents à traiter (J/K + S pour sauvegarder)
-- [ ] **[V6-8]** Commentaires internes sur un document
-- [ ] **[V6-9]** Log d'activité par document (qui a modifié quoi et quand)
+- ~~**[V6-5]**~~ Statut de document — écarté (non pertinent pour usage solo)
+- ~~**[V6-6]**~~ Page "À traiter" — écartée (non pertinent pour usage solo)
+- ~~**[V6-7]**~~ Mode révision rapide — écarté (non pertinent pour usage solo)
+- ~~**[V6-8]**~~ Commentaires internes — écarté (redondant avec le champ notes)
+- [x] **[V6-9]** Log d'activité par document — timeline dans un drawer latéral (upload, titre, correspondant, type, catégorie, montant, date, notes, archivage)
 
 ---
 

@@ -17,6 +17,8 @@ from app.models.document import CategoryEnum, Document, document_tags
 from app.models.tag import Tag
 from pydantic import BaseModel
 
+from app.models.document_activity import ActivityEventEnum, DocumentActivity
+from app.models.notification import Notification, NotificationTypeEnum
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
 
 
@@ -27,6 +29,56 @@ from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, save_uplo
 from app.services.preview_service import delete_preview, generate_preview
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+def _is_complete(doc: Document) -> bool:
+    return bool(
+        doc.document_type_id
+        and doc.correspondent_id
+        and (doc.category == CategoryEnum.autre or doc.amount_ttc)
+    )
+
+
+def _missing_body(doc: Document) -> str:
+    missing = []
+    if not doc.correspondent_id:
+        missing.append("correspondant")
+    if not doc.document_type_id:
+        missing.append("type")
+    if doc.category != CategoryEnum.autre and not doc.amount_ttc:
+        missing.append("montant")
+    return "Sans " + " · sans ".join(missing) if missing else "Informations incomplètes"
+
+
+async def _sync_notification(doc: Document, session: AsyncSession) -> None:
+    unread_result = await session.execute(
+        select(Notification).where(Notification.document_id == doc.id, Notification.read == False)
+    )
+    unread = list(unread_result.scalars().all())
+
+    if _is_complete(doc):
+        for n in unread:
+            n.read = True
+    else:
+        if not unread:
+            existing = await session.scalar(
+                select(Notification)
+                .where(Notification.document_id == doc.id)
+                .order_by(Notification.created_at.desc())
+                .limit(1)
+            )
+            if existing:
+                existing.read = False
+                existing.title = f"« {doc.title} » — informations manquantes"
+                existing.body = _missing_body(doc)
+            else:
+                session.add(Notification(
+                    type=NotificationTypeEnum.incomplete_document,
+                    document_id=doc.id,
+                    title=f"« {doc.title} » — informations manquantes",
+                    body=_missing_body(doc),
+                ))
+    await session.commit()
 
 
 def _extract_pdf_date(file_path: str) -> date | None:
@@ -112,6 +164,19 @@ async def upload_document(
     )
     session.add(doc)
     await session.commit()
+
+    session.add(Notification(
+        type=NotificationTypeEnum.incomplete_document,
+        document_id=document_id,
+        title=f"« {stem} » importé — à compléter",
+        body="Sans correspondant · Sans type",
+    ))
+    session.add(DocumentActivity(
+        document_id=document_id,
+        event_type=ActivityEventEnum.uploaded,
+    ))
+    await session.commit()
+
     return await _get_doc_or_404(session, document_id)
 
 
@@ -162,6 +227,7 @@ async def update_document(
 
     update_data = data.model_dump(exclude_unset=True)
     tag_ids = update_data.pop("tag_ids", None)
+    old_archived = doc.archived
 
     for field, value in update_data.items():
         setattr(doc, field, value)
@@ -179,6 +245,14 @@ async def update_document(
         await session.rollback()
         raise HTTPException(status_code=409, detail="Invalid correspondent or document type")
 
+    if "archived" in update_data and doc.archived != old_archived:
+        session.add(DocumentActivity(
+            document_id=id,
+            event_type=ActivityEventEnum.archived if doc.archived else ActivityEventEnum.unarchived,
+        ))
+        await session.commit()
+
+    await _sync_notification(doc, session)
     return await _get_doc_or_404(session, id)
 
 
@@ -242,6 +316,25 @@ async def convert_currency(
         raise HTTPException(status_code=502, detail=f"Currency conversion failed: {e}")
 
     return {"amount_eur": str((body.amount / rate).quantize(Decimal("0.01")))}
+
+
+@router.get("/{id}/activity")
+async def get_document_activity(id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[dict]:
+    result = await session.execute(
+        select(DocumentActivity)
+        .where(DocumentActivity.document_id == id)
+        .order_by(DocumentActivity.created_at.asc())
+    )
+    return [
+        {
+            "id": str(a.id),
+            "event_type": a.event_type.value,
+            "old_value": a.old_value,
+            "new_value": a.new_value,
+            "created_at": a.created_at.isoformat(),
+        }
+        for a in result.scalars().all()
+    ]
 
 
 @router.delete("/{id}", status_code=204)

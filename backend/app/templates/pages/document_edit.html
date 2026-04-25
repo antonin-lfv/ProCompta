@@ -95,6 +95,16 @@ function docEditData() {
     </div>
     <div class="flex items-center gap-2">
 
+      <!-- Historique -->
+      <button type="button"
+              @click="$dispatch('open-activity')"
+              class="p-2 rounded-lg text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+              title="Historique des modifications">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+      </button>
+
       <!-- Télécharger -->
       <a href="/api/documents/{{ doc.id }}/file"
          download="{{ doc.title }}{{ {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}.get(doc.mime_type, "") }}"
@@ -558,4 +568,182 @@ function docEditData() {
   </div>
 
 </div>
+
+<!-- ── Drawer historique ───────────────────────────────────────────────────── -->
+<div x-data="{
+  open: false,
+  events: [],
+  loading: false,
+  async load() {
+    this.open = true;
+    if (this.events.length) return;
+    this.loading = true;
+    try {
+      const r = await fetch('/api/documents/{{ doc.id }}/activity');
+      this.events = await r.json();
+    } finally { this.loading = false; }
+  },
+  label(t) {
+    return {
+      uploaded: 'Document importé',
+      title_changed: 'Titre modifié',
+      correspondent_changed: 'Correspondant modifié',
+      type_changed: 'Type modifié',
+      category_changed: 'Catégorie modifiée',
+      amount_changed: 'Montant modifié',
+      date_changed: 'Date modifiée',
+      notes_changed: 'Notes modifiées',
+      archived: 'Archivé',
+      unarchived: 'Désarchivé',
+    }[t] || t;
+  },
+  catLabel(v) {
+    return {depense: 'Dépense', recette: 'Recette', autre: 'Autre'}[v] || v;
+  },
+  fmtDate(s) {
+    const d = new Date(s);
+    return d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'})
+      + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  }
+}"
+@open-activity.window="load()"
+@keydown.escape.window="open = false">
+
+  <!-- Backdrop -->
+  <div x-show="open" x-cloak
+       class="fixed inset-0 bg-slate-900/30 z-40"
+       @click="open = false">
+  </div>
+
+  <!-- Drawer -->
+  <div x-show="open" x-cloak
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="translate-x-full"
+       x-transition:enter-end="translate-x-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="translate-x-0"
+       x-transition:leave-end="translate-x-full"
+       class="fixed inset-y-0 right-0 z-50 w-96 bg-white shadow-2xl flex flex-col">
+
+    <!-- Header drawer -->
+    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+      <div class="flex items-center gap-2 text-slate-800">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-slate-500">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        <span class="text-sm font-semibold">Historique</span>
+      </div>
+      <button @click="open = false"
+              class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="flex-1 overflow-y-auto px-5 py-4">
+
+      <!-- Loading -->
+      <div x-show="loading" class="flex items-center justify-center py-12">
+        <svg class="animate-spin w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+      </div>
+
+      <!-- Vide -->
+      <div x-show="!loading && events.length === 0" class="py-12 text-center text-sm text-slate-400">
+        Aucun événement enregistré.
+      </div>
+
+      <!-- Timeline -->
+      <div x-show="!loading && events.length > 0" class="relative">
+        <!-- Ligne verticale -->
+        <div class="absolute left-3.5 top-2 bottom-2 w-px bg-slate-200"></div>
+
+        <div class="space-y-5">
+          <template x-for="(e, i) in events" :key="e.id">
+            <div class="flex gap-3.5">
+              <!-- Dot -->
+              <div class="shrink-0 w-7 h-7 rounded-full bg-white border-2 flex items-center justify-center z-10"
+                   :class="e.event_type === 'uploaded' ? 'border-indigo-400' : 'border-slate-300'">
+                <!-- uploaded -->
+                <template x-if="e.event_type === 'uploaded'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-indigo-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                  </svg>
+                </template>
+                <!-- title -->
+                <template x-if="e.event_type === 'title_changed'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+                  </svg>
+                </template>
+                <!-- correspondent -->
+                <template x-if="e.event_type === 'correspondent_changed'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                  </svg>
+                </template>
+                <!-- type -->
+                <template x-if="e.event_type === 'type_changed'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                  </svg>
+                </template>
+                <!-- category -->
+                <template x-if="e.event_type === 'category_changed'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+                  </svg>
+                </template>
+                <!-- amount -->
+                <template x-if="e.event_type === 'amount_changed'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
+                  </svg>
+                </template>
+                <!-- date -->
+                <template x-if="e.event_type === 'date_changed'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                  </svg>
+                </template>
+                <!-- notes -->
+                <template x-if="e.event_type === 'notes_changed'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                  </svg>
+                </template>
+                <!-- archived / unarchived -->
+                <template x-if="e.event_type === 'archived' || e.event_type === 'unarchived'">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 text-slate-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                  </svg>
+                </template>
+              </div>
+
+              <!-- Contenu -->
+              <div class="flex-1 pb-1">
+                <p class="text-sm font-medium text-slate-800" x-text="label(e.event_type)"></p>
+                <!-- old → new pour les champs avec valeurs -->
+                <template x-if="e.old_value || e.new_value">
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    <span x-show="e.old_value" x-text="e.event_type === 'category_changed' ? catLabel(e.old_value) : e.old_value"
+                          class="line-through text-slate-400"></span>
+                    <span x-show="e.old_value && e.new_value" class="mx-1">→</span>
+                    <span x-show="e.new_value" x-text="e.event_type === 'category_changed' ? catLabel(e.new_value) : e.new_value"></span>
+                  </p>
+                </template>
+                <p class="text-xs text-slate-400 mt-0.5" x-text="fmtDate(e.created_at)"></p>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

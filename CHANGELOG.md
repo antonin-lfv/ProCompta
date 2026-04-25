@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0] - 2026-04-25
+
+### Ajouté
+- **Centre de notifications** — cloche dans la navbar avec badge rouge (nombre non lus), dropdown des 5 dernières notifications, fermeture en cliquant ailleurs
+- **Alerte documents incomplets** — notification créée automatiquement à l'upload ; réactivée si un document complet redevient incomplet (champ supprimé) ; marquée lue automatiquement dès que le document est complété
+- **Page Notifications** (`/notifications`) — historique complet lu/non lu, marquer comme lu, marquer comme non lu, supprimer ; synchronisation bidirectionnelle en temps réel avec la cloche navbar (événements Alpine.js window)
+- **Log d'activité** — bouton horloge dans le header de la page d'édition, ouvre un drawer latéral droit avec la timeline de toutes les modifications : upload, titre, correspondant, type, catégorie, montant + devise, date, notes, archivage/désarchivage ; icônes Heroicons par type d'événement, valeurs avant/après avec barré pour l'ancienne valeur
+### Technique
+- Modèle `Notification` (`notifications` table) : `type`, `document_id` (FK CASCADE), `title`, `body`, `read`
+- Modèle `DocumentActivity` (`document_activity` table) : `document_id` (FK CASCADE), `event_type` (enum), `old_value`, `new_value`, `created_at` ; indexes sur `document_id` et `created_at`
+- Router `/api/notifications` : `GET /`, `GET /unread-count`, `PATCH /read-all`, `PATCH /{id}/read`, `PATCH /{id}/unread`, `DELETE /{id}`
+- Endpoint `GET /api/documents/{id}/activity` — retourne la liste des événements triée chronologiquement
+- Migrations Alembic `20260425_0006` (notifications) et `20260425_0007` (document_activity) — pattern `DO $$ BEGIN CREATE TYPE ... EXCEPTION WHEN duplicate_object THEN NULL; END $$` pour les enums PostgreSQL
+- Déduplication des notifications : réactivation de la notification existante (lue ou non lue) plutôt que création d'un doublon
+- Alpine.js plain-object reactivity (`readMap`/`deletedMap`) à la place de `Set` (non intercepté par Proxy Alpine)
+- Données JSON en `<script>` tag pour éviter les conflits de guillemets dans les attributs `x-data`
+
+---
+
 ## [0.5.0] - 2026-04-25
 
 ### Ajouté
