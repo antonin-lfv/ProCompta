@@ -3,6 +3,33 @@
 
 {% block title %}Documents{% endblock %}
 
+{% block head %}
+<script>
+function deleteDocInList(docId) {
+  const row = document.getElementById('doc-' + docId);
+  if (!row) return;
+  row.remove();
+  const tbody = document.querySelector('#docs-table tbody');
+  if (tbody && tbody.querySelectorAll('tr').length === 0) {
+    window.location.reload();
+    return;
+  }
+  const header = document.getElementById('docs-header-count');
+  if (header) {
+    const count = Math.max(0, parseInt(header.dataset.count || 0) - 1);
+    header.dataset.count = count;
+    const mode = header.dataset.mode;
+    const s = count !== 1 ? 's' : '';
+    if (mode === 'archived') header.textContent = `${count} document${s} archivé${s}`;
+    else if (mode === 'no_type') header.textContent = `${count} document${s} sans type`;
+    else if (mode === 'no_correspondent') header.textContent = `${count} document${s} sans correspondant`;
+    else header.textContent = `${count} document${s} au total`;
+  }
+  window.dispatchEvent(new CustomEvent('notif-changed', {detail: null}));
+}
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-7xl mx-auto space-y-6">
 
@@ -11,7 +38,9 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-bold text-slate-900">Documents</h1>
-      <p class="text-sm text-slate-500 mt-0.5">
+      <p class="text-sm text-slate-500 mt-0.5" id="docs-header-count"
+         data-count="{{ total }}"
+         data-mode="{% if show_archived %}archived{% elif no_type %}no_type{% elif no_correspondent %}no_correspondent{% else %}all{% endif %}">
         {% if show_archived %}
           {{ total }} document{{ "s" if total != 1 else "" }} archivé{{ "s" if total != 1 else "" }}
         {% elif no_type %}
@@ -111,7 +140,7 @@
   <!-- Table -->
   <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
     {% if documents %}
-      <table class="w-full text-sm table-fixed min-w-[800px]">
+      <table class="w-full text-sm table-fixed min-w-[800px]" id="docs-table">
         <colgroup>
           <col style="width: 30%">
           <col style="width: 110px">
@@ -195,7 +224,7 @@
                 <button
                   hx-delete="/api/documents/{{ doc.id }}"
                   hx-confirm="Supprimer définitivement ce document ?"
-                  hx-on::after-request="if(event.detail.successful) document.getElementById('doc-{{ doc.id }}').remove()"
+                  hx-on::after-request="if(event.detail.successful) deleteDocInList('{{ doc.id }}')"
                   class="p-1.5 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors"
                   title="Supprimer">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">

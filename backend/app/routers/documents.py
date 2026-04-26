@@ -28,6 +28,38 @@ class ConvertRequest(BaseModel):
     currency: str
     amount: Decimal
 
+
+class GenericConvertRequest(BaseModel):
+    currency: str
+    amount: Decimal
+    date: str | None = None  # ISO date, optionnel — défaut: aujourd'hui
+
+
+async def _fetch_ecb_rate(currency: str, rate_date: date) -> Decimal | None:
+    today = date.today()
+
+    async def _call(start: str, end: str) -> Decimal | None:
+        url = (
+            f"https://data-api.ecb.europa.eu/service/data/"
+            f"EXR/D.{currency}.EUR.SP00.A"
+            f"?startPeriod={start}&endPeriod={end}&format=jsondata"
+        )
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            obs = resp.json()["dataSets"][0]["series"]["0:0:0:0:0"]["observations"]
+            if not obs:
+                return None
+            return Decimal(str(obs[str(max(int(k) for k in obs))][0]))
+
+    return await _call(
+        (rate_date - timedelta(days=10)).isoformat(),
+        rate_date.isoformat(),
+    ) or await _call(
+        (today - timedelta(days=30)).isoformat(),
+        today.isoformat(),
+    )
+
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
@@ -290,6 +322,27 @@ async def get_document_file(id: uuid.UUID, request: Request, session: AsyncSessi
     )
 
 
+@router.post("/convert-currency")
+async def convert_currency_generic(body: GenericConvertRequest) -> dict:
+    """Conversion BCE sans document — utilisé par l'import batch."""
+    if body.currency == "EUR":
+        return {"amount_eur": str(body.amount)}
+    today = date.today()
+    rate_date = today
+    if body.date:
+        try:
+            rate_date = min(date.fromisoformat(body.date), today)
+        except ValueError:
+            pass
+    try:
+        rate = await _fetch_ecb_rate(body.currency, rate_date)
+        if rate is None:
+            raise ValueError("No ECB rate available")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Currency conversion failed: {e}")
+    return {"amount_eur": str((body.amount / rate).quantize(Decimal("0.01")))}
+
+
 @router.post("/{id}/convert-currency")
 async def convert_currency(
     id: uuid.UUID,
@@ -305,29 +358,8 @@ async def convert_currency(
 
     today = date.today()
     rate_date = min(doc.payment_date or doc.document_date, today)
-
-    async def _ecb_rate(start: str, end: str) -> Decimal | None:
-        url = (
-            f"https://data-api.ecb.europa.eu/service/data/"
-            f"EXR/D.{body.currency}.EUR.SP00.A"
-            f"?startPeriod={start}&endPeriod={end}&format=jsondata"
-        )
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            obs = resp.json()["dataSets"][0]["series"]["0:0:0:0:0"]["observations"]
-            if not obs:
-                return None
-            return Decimal(str(obs[str(max(int(k) for k in obs))][0]))
-
     try:
-        rate = await _ecb_rate(
-            (rate_date - timedelta(days=10)).isoformat(),
-            rate_date.isoformat(),
-        ) or await _ecb_rate(
-            (today - timedelta(days=30)).isoformat(),
-            today.isoformat(),
-        )
+        rate = await _fetch_ecb_rate(body.currency, rate_date)
         if rate is None:
             raise ValueError("No ECB rate available")
     except Exception as e:

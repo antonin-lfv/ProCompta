@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0] - 2026-04-26
+
+### Ajouté
+- **Import batch — modale carousel** — sélection multiple de fichiers (PDF, JPEG, PNG) ; modale plein-écran téléportée au `<body>` (`x-teleport`) pour éviter tout conflit de stacking context ; un fichier à la fois avec barre de progression carousel
+- **Preview dans le carousel** — images rendues via FileReader (data URL), PDFs via `URL.createObjectURL` + `<embed>` natif ; nettoyage automatique des object URLs à la fermeture
+- **Formulaire complet par fichier** — titre, date document, catégorie (Dépense / Recette / Autre), correspondant, type de document, tags, montants (HT / TVA / TTC / devise), date de paiement
+- **Conversion BCE intégrée dans le batch** — bouton rotatif à côté du champ "Équivalent EUR", taux historique BCE à la date de paiement (ou du jour) ; nouvel endpoint générique `POST /api/documents/convert-currency` (sans doc ID requis)
+- **Traitement séquentiel avec résumé** — upload + PATCH métadonnées pour chaque fichier, barre de progression X/N, résumé final (importés · doublons · erreurs)
+- **Navigation clavier** — flèches ← → pour naviguer entre les fichiers, Échap pour fermer
+
+### Technique
+- `POST /api/documents/convert-currency` — endpoint générique acceptant `{ currency, amount, date? }` sans requérir un document existant
+- Helper `_fetch_ecb_rate(currency, rate_date)` extrait et partagé entre les deux endpoints de conversion
+- Objets `File` natifs stockés dans une closure non-réactive (`_rawFiles`) pour éviter que le proxy Alpine 3 ne corrompe leur réactivité
+- `GenericConvertRequest` — nouveau schéma Pydantic avec champ `date` optionnel
+
+---
+
 ## [1.0.0] - 2026-04-25
 
 ### Ajouté
