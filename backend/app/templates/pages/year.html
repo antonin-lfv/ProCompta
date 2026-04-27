@@ -51,6 +51,7 @@ function deleteDocRow(docId) {
     headerStats.innerHTML = html;
   }
   window.dispatchEvent(new CustomEvent('notif-changed', {detail: null}));
+  window.dispatchEvent(new CustomEvent('doc-deleted', {detail: docId}));
 }
 
 function yearData() {
@@ -65,6 +66,10 @@ function yearData() {
     uploading: false,
     uploadError: '',
     dupId: '',
+
+    // Bulk selection
+    selectedIds: [],
+    showBulkDeleteConfirm: false,
 
     // Batch modal
     batchModal: false,
@@ -83,20 +88,20 @@ function yearData() {
     tags: PC_TAGS,
     todayISO: new Date().toISOString().split('T')[0],
 
-    async handleDrop(e) {
-      this.dragOver = false;
-      if (this.uploading || this.batchModal) return;
-      const files = Array.from(e.dataTransfer?.files || []);
+    async _routeFiles(files) {
       if (!files.length) return;
       if (files.length === 1) { await this.upload(files[0]); }
       else { await this.openBatchModal(files); }
     },
+    async handleDrop(e) {
+      this.dragOver = false;
+      if (this.uploading || this.batchModal) return;
+      await this._routeFiles(Array.from(e.dataTransfer?.files || []));
+    },
     async handleFile(e) {
       const files = Array.from(e.target.files);
       e.target.value = '';
-      if (!files.length) return;
-      if (files.length === 1) { await this.upload(files[0]); }
-      else { await this.openBatchModal(files); }
+      await this._routeFiles(files);
     },
     async upload(file) {
       if (this.uploading) return;
@@ -174,6 +179,8 @@ function yearData() {
       if (this.batchIdx > 0) { this.batchIdx--; this.openTagPicker = false; }
     },
     batchDeleteCurrent() {
+      const item = this.batchFiles[this.batchIdx];
+      if (item?.previewKind === 'pdf' && item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
       this.batchFiles.splice(this.batchIdx, 1);
       _rawFiles.splice(this.batchIdx, 1);
       this.openTagPicker = false;
@@ -181,6 +188,7 @@ function yearData() {
       if (this.batchIdx >= this.batchFiles.length) this.batchIdx = this.batchFiles.length - 1;
     },
     closeBatchModal() {
+      const shouldReload = this.batchState === 'done';
       this.batchFiles.forEach(item => { if (item.previewKind === 'pdf' && item.previewUrl) URL.revokeObjectURL(item.previewUrl); });
       this.batchModal = false;
       this.batchFiles = [];
@@ -189,6 +197,7 @@ function yearData() {
       this.batchState = 'editing';
       this.batchResults = [];
       this.openTagPicker = false;
+      if (shouldReload) window.location.reload();
     },
     async startBatchUpload() {
       this.openTagPicker = false;
@@ -216,11 +225,11 @@ function yearData() {
                 document_type_id: item.document_type_id || null,
                 tag_ids: item.tag_ids || [],
                 currency: item.currency || 'EUR',
-                amount_ht: item.amount_ht !== '' ? parseFloat(item.amount_ht) : null,
-                vat_amount: item.vat_amount !== '' ? parseFloat(item.vat_amount) : null,
-                amount_ttc: item.amount_ttc !== '' ? parseFloat(item.amount_ttc) : null,
-                amount_ttc_eur: item.amount_ttc_eur !== '' ? parseFloat(item.amount_ttc_eur) : null,
-                payment_date: item.payment_date || null,
+                amount_ht: item.category !== 'autre' && item.amount_ht !== '' ? parseFloat(item.amount_ht) : null,
+                vat_amount: item.category !== 'autre' && item.vat_amount !== '' ? parseFloat(item.vat_amount) : null,
+                amount_ttc: item.category !== 'autre' && item.amount_ttc !== '' ? parseFloat(item.amount_ttc) : null,
+                amount_ttc_eur: item.category !== 'autre' && item.amount_ttc_eur !== '' ? parseFloat(item.amount_ttc_eur) : null,
+                payment_date: item.category !== 'autre' ? item.payment_date || null : null,
               }),
             });
             this.batchResults = [...this.batchResults, { name: item.title || item.name, status: 'ok' }];
@@ -267,6 +276,62 @@ function yearData() {
         ? item.tag_ids.filter(id => id !== tagId)
         : [...item.tag_ids, tagId];
     },
+
+    // Bulk selection
+    toggleSelect(id) {
+      if (this.selectedIds.includes(id)) {
+        this.selectedIds = this.selectedIds.filter(x => x !== id);
+      } else {
+        this.selectedIds = [...this.selectedIds, id];
+      }
+    },
+    isSelected(id) {
+      return this.selectedIds.includes(id);
+    },
+    toggleSelectAll(tableEl) {
+      const ids = Array.from(tableEl.querySelectorAll('tbody tr')).map(r => r.id.replace('doc-', ''));
+      const allSelected = ids.length > 0 && ids.every(id => this.selectedIds.includes(id));
+      if (allSelected) {
+        this.selectedIds = this.selectedIds.filter(x => !ids.includes(x));
+      } else {
+        const toAdd = ids.filter(x => !this.selectedIds.includes(x));
+        this.selectedIds = [...this.selectedIds, ...toAdd];
+      }
+    },
+    areAllSelected(tableEl) {
+      const rows = Array.from(tableEl?.querySelectorAll('tbody tr') || []);
+      if (!rows.length) return false;
+      return rows.every(r => this.selectedIds.includes(r.id.replace('doc-', '')));
+    },
+    clearSelection() {
+      this.selectedIds = [];
+      this.showBulkDeleteConfirm = false;
+    },
+    async bulkArchive(archived = true) {
+      if (!this.selectedIds.length) return;
+      const ids = [...this.selectedIds];
+      const resp = await fetch('/api/documents/bulk-archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, archived }),
+      });
+      if (resp.ok) window.location.reload();
+    },
+    async bulkDelete() {
+      if (!this.selectedIds.length) return;
+      const ids = [...this.selectedIds];
+      const resp = await fetch('/api/documents/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (resp.ok) {
+        ids.forEach(id => deleteDocRow(id));
+        this.selectedIds = [];
+        this.showBulkDeleteConfirm = false;
+        window.dispatchEvent(new CustomEvent('notif-changed', { detail: null }));
+      }
+    },
   };
 }
 </script>
@@ -280,6 +345,7 @@ function yearData() {
   @dragleave.window="if(!$event.relatedTarget) dragOver = false"
   @drop.window.prevent="dragOver = false; handleDrop($event)"
   @trigger-upload.window="$el.querySelector('input[type=file]')?.click()"
+  @doc-deleted.window="selectedIds = selectedIds.filter(id => id !== $event.detail)"
 >
 
   <!-- Drag-and-drop overlay (visuel uniquement, événements gérés au niveau window) -->
@@ -461,8 +527,9 @@ function yearData() {
 
   {% macro doc_table(docs, back_year, sort, order, sort_base_url) %}
   <div class="overflow-x-auto">
-  <table class="w-full text-sm table-fixed min-w-[800px]">
+  <table class="w-full text-sm table-fixed min-w-[840px]">
     <colgroup>
+      <col style="width: 40px">
       <col style="width: 30%">
       <col style="width: 110px">
       <col style="width: 18%">
@@ -473,6 +540,12 @@ function yearData() {
     </colgroup>
     <thead>
       <tr class="border-b border-slate-200 bg-slate-50/50">
+        <th class="px-3 py-3">
+          <input type="checkbox"
+                 class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                 :checked="areAllSelected($el.closest('table'))"
+                 @click.stop="toggleSelectAll($el.closest('table'))">
+        </th>
         {{ sort_th("Titre", "title", sort_base_url, sort, order, align="left", default_order="asc") }}
         {{ sort_th("Date", "date", sort_base_url, sort, order, align="left", default_order="desc") }}
         {{ sort_th("Correspondant", "correspondent", sort_base_url, sort, order, align="left", default_order="asc") }}
@@ -486,7 +559,14 @@ function yearData() {
       {% for doc in docs %}
       <tr class="hover:bg-slate-50 transition-colors group cursor-pointer" id="doc-{{ doc.id }}"
           data-amount="{{ doc.amount_ttc_eur if (doc.currency != 'EUR' and doc.amount_ttc_eur) else (doc.amount_ttc or 0) }}"
-          @click="if(!$event.target.closest('button, a')) window.location.href='/documents/{{ doc.id }}/edit'">
+          :class="isSelected('{{ doc.id }}') ? 'bg-indigo-50/60' : ''"
+          @click="if(!$event.target.closest('button, a, input')) window.location.href='/documents/{{ doc.id }}/edit'">
+        <td class="px-3 py-3" @click.stop>
+          <input type="checkbox"
+                 class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                 :checked="isSelected('{{ doc.id }}')"
+                 @change="toggleSelect('{{ doc.id }}')">
+        </td>
         <td class="px-4 py-3">
           <a href="/documents/{{ doc.id }}/edit"
              class="font-medium text-slate-800 hover:text-indigo-600 transition-colors truncate block">
@@ -786,6 +866,7 @@ function yearData() {
               <div>
                 <label class="block text-xs text-slate-400 mb-1">Devise</label>
                 <select x-model="batchFiles[batchIdx].currency"
+                        @change="batchFiles[batchIdx].amount_ttc_eur = ''"
                         class="w-full h-9 text-sm rounded-lg border border-slate-200 px-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
@@ -966,6 +1047,87 @@ function yearData() {
 
     </div>
   </div>
+  </template>
+
+  <!-- Floating bulk action bar + bulk delete confirm — teleporté au <body> -->
+  <template x-teleport="body">
+    <!-- Barre flottante -->
+    <div
+      x-show="selectedIds.length > 0 && !showBulkDeleteConfirm"
+      x-cloak
+      x-transition:enter="transition ease-out duration-150"
+      x-transition:enter-start="opacity-0 translate-y-4"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-100"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 translate-y-4"
+      class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900 text-white rounded-2xl shadow-2xl px-5 py-3 whitespace-nowrap"
+    >
+      <span class="text-sm font-medium" x-text="selectedIds.length + ' document' + (selectedIds.length > 1 ? 's' : '') + ' sélectionné' + (selectedIds.length > 1 ? 's' : '')"></span>
+      <div class="w-px h-4 bg-white/20"></div>
+      <button
+        @click="bulkArchive(true)"
+        class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 4.875v4.5m0-4.5-1.875 1.875M12 12.375l1.875 1.875M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+        </svg>
+        Archiver
+      </button>
+      <button
+        @click="bulkArchive(false)"
+        class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+        </svg>
+        Désarchiver
+      </button>
+      <button
+        @click="showBulkDeleteConfirm = true"
+        class="inline-flex items-center gap-1.5 text-sm font-medium text-red-400 hover:text-red-300 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+        </svg>
+        Supprimer
+      </button>
+      <button @click="clearSelection()" class="ml-1 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Désélectionner tout">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal confirmation suppression groupée -->
+    <div
+      x-show="showBulkDeleteConfirm"
+      x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      @keydown.escape.window="showBulkDeleteConfirm = false"
+    >
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-red-600">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-slate-900">Supprimer les documents</h3>
+            <p class="text-sm text-slate-500 mt-0.5" x-text="`${selectedIds.length} document${selectedIds.length > 1 ? 's' : ''} sera${selectedIds.length > 1 ? 'ont' : ''} supprimé${selectedIds.length > 1 ? 's' : ''} définitivement.`"></p>
+          </div>
+        </div>
+        <p class="text-sm text-slate-600">Cette action est irréversible. Les fichiers associés seront également supprimés.</p>
+        <div class="flex gap-3 pt-1">
+          <button @click="showBulkDeleteConfirm = false"
+                  class="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Annuler
+          </button>
+          <button @click="bulkDelete()"
+                  class="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors">
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
   </template>
 
 </div>

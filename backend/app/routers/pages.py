@@ -783,6 +783,43 @@ async def reports(
         for name, data in sorted(_corr_pivot.items(), key=lambda x: x[0].lower())
     ]
 
+    # TVA par trimestre — toujours sur l'année complète (T1→T4)
+    _base_year = [extract("year", Document.document_date) == year, Document.archived == False]
+    tva_q_result = await session.execute(
+        select(
+            extract("quarter", Document.document_date).label("q"),
+            func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.depense), 0).label("base_ht_dep"),
+            func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.depense), 0).label("tva_ded"),
+            func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.recette), 0).label("base_ht_rec"),
+            func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.recette), 0).label("tva_col"),
+        )
+        .where(*_base_year)
+        .group_by(extract("quarter", Document.document_date))
+        .order_by(extract("quarter", Document.document_date))
+    )
+    _tva_by_q: dict[int, dict] = {}
+    for r in tva_q_result.all():
+        q = int(r.q)
+        _tva_by_q[q] = {
+            "quarter": q,
+            "base_ht_dep": float(r.base_ht_dep or 0),
+            "tva_ded":     float(r.tva_ded or 0),
+            "base_ht_rec": float(r.base_ht_rec or 0),
+            "tva_col":     float(r.tva_col or 0),
+        }
+    tva_rows = []
+    for q in range(1, 5):
+        row = _tva_by_q.get(q, {"quarter": q, "base_ht_dep": 0.0, "tva_ded": 0.0, "base_ht_rec": 0.0, "tva_col": 0.0})
+        row["solde"] = row["tva_col"] - row["tva_ded"]
+        tva_rows.append(row)
+    tva_total = {
+        "base_ht_dep": sum(r["base_ht_dep"] for r in tva_rows),
+        "tva_ded":     sum(r["tva_ded"] for r in tva_rows),
+        "base_ht_rec": sum(r["base_ht_rec"] for r in tva_rows),
+        "tva_col":     sum(r["tva_col"] for r in tva_rows),
+        "solde":       sum(r["solde"] for r in tva_rows),
+    }
+
     return render(request, "pages/reports.html", {
         "year": year,
         "quarter": quarter,
@@ -790,6 +827,8 @@ async def reports(
         "available_years": available_years,
         "bilan_rows": bilan_rows,
         "corr_rows": corr_rows,
+        "tva_rows": tva_rows,
+        "tva_total": tva_total,
     })
 
 
@@ -890,6 +929,69 @@ async def export_bilan_csv(
         iter([content.encode("utf-8")]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="procompta_{year}{suffix}_bilan.csv"'},
+    )
+
+
+@router.get("/reports/export/tva")
+async def export_tva_csv(
+    year: int = Query(...),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    _base_year = [extract("year", Document.document_date) == year, Document.archived == False]
+    tva_q_result = await session.execute(
+        select(
+            extract("quarter", Document.document_date).label("q"),
+            func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.depense), 0).label("base_ht_dep"),
+            func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.depense), 0).label("tva_ded"),
+            func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.recette), 0).label("base_ht_rec"),
+            func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.recette), 0).label("tva_col"),
+        )
+        .where(*_base_year)
+        .group_by(extract("quarter", Document.document_date))
+        .order_by(extract("quarter", Document.document_date))
+    )
+    _tva_by_q: dict[int, dict] = {}
+    for r in tva_q_result.all():
+        q = int(r.q)
+        _tva_by_q[q] = {
+            "quarter": q,
+            "base_ht_dep": float(r.base_ht_dep or 0),
+            "tva_ded":     float(r.tva_ded or 0),
+            "base_ht_rec": float(r.base_ht_rec or 0),
+            "tva_col":     float(r.tva_col or 0),
+        }
+    tva_rows = []
+    for q in range(1, 5):
+        row = _tva_by_q.get(q, {"quarter": q, "base_ht_dep": 0.0, "tva_ded": 0.0, "base_ht_rec": 0.0, "tva_col": 0.0})
+        row["solde"] = row["tva_col"] - row["tva_ded"]
+        tva_rows.append(row)
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(["Trimestre", "Base HT dépenses (€)", "TVA déductible (€)", "Base HT recettes (€)", "TVA collectée (€)", "Solde net TVA (€)"])
+    for row in tva_rows:
+        writer.writerow([
+            f"T{row['quarter']} {year}",
+            f"{row['base_ht_dep']:.2f}",
+            f"{row['tva_ded']:.2f}",
+            f"{row['base_ht_rec']:.2f}",
+            f"{row['tva_col']:.2f}",
+            f"{row['solde']:.2f}",
+        ])
+    total_solde = sum(r["solde"] for r in tva_rows)
+    writer.writerow([
+        f"Total {year}",
+        f"{sum(r['base_ht_dep'] for r in tva_rows):.2f}",
+        f"{sum(r['tva_ded'] for r in tva_rows):.2f}",
+        f"{sum(r['base_ht_rec'] for r in tva_rows):.2f}",
+        f"{sum(r['tva_col'] for r in tva_rows):.2f}",
+        f"{total_solde:.2f}",
+    ])
+    content = "﻿" + output.getvalue()
+    return StreamingResponse(
+        iter([content.encode("utf-8")]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="procompta_{year}_tva.csv"'},
     )
 
 

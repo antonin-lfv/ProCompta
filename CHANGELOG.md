@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.3.0] - 2026-04-27
+
+### Ajouté
+- **TVA trimestrielle** — nouvelle section dans `/reports` affichant T1→T4 : Base HT dépenses, TVA déductible, Base HT recettes, TVA collectée, Solde net TVA, avec ligne de total annuel
+- **Export CSV TVA** — `GET /reports/export/tva?year=` dédié avec colonnes par trimestre + ligne de total
+
+### Technique
+- Query SQLAlchemy groupée par trimestre (`extract("quarter", ...)`) pour agréger HT et TVA par catégorie
+- Données TVA toujours calculées sur l'année complète (indépendant du filtre `?quarter=` de la page)
+
+---
+
+## [1.2.0] - 2026-04-27
+
+### Ajouté
+- **Sélection groupée** — colonne checkbox dans tous les tableaux (vue année + vue documents), checkbox "sélectionner tout" par section
+- **Barre d'actions flottante** — apparaît dès qu'un document est coché, affiche le nombre sélectionné, actions Archiver et Supprimer ; téléportée au `<body>` via `x-teleport`
+- **Archivage groupé** — `POST /api/documents/bulk-archive` : archive tous les documents sélectionnés, log d'activité et sync notifications
+- **Suppression groupée** — `POST /api/documents/bulk-delete` : modale de confirmation, supprime les fichiers physiques et previews, met à jour les compteurs de section
+- Désélection automatique après action ; sélection nettoyée sur suppression individuelle via événement `doc-deleted`
+
+### Technique
+- `BulkActionRequest` — nouveau schéma Pydantic `{ ids: list[uuid] }`
+- `yearData()` étendu avec `selectedIds[]`, `toggleSelect`, `toggleSelectAll`, `areAllSelected`, `clearSelection`, `bulkArchive`, `bulkDelete`
+- `docsData()` — nouveau composant Alpine sur `/documents` unifiant `showFilters` et la sélection groupée
+
+---
+
 ## [1.1.0] - 2026-04-26
 
 ### Ajouté

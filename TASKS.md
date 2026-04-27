@@ -1,6 +1,6 @@
 # ProCompta - Suivi des tâches
 
-## Version courante : `v1.1.0` ✅ — Prochaine : `v1.2.0`
+## Version courante : `v1.3.0` ✅ — Prochaine : `v1.4.0`
 
 ---
 
@@ -232,30 +232,30 @@
 
 ---
 
-### 🔜 À faire - v1.2.0
+### ✅ Terminé - v1.2.0
 
 > Objectif : agir sur plusieurs documents à la fois.
 
-- [ ] **[V12-1]** Colonne checkbox à gauche des tableaux (vue année + vue documents) — sélection individuelle
-- [ ] **[V12-2]** Checkbox "Sélectionner tout" dans le header de tableau — coche/décoche toute la section visible
-- [ ] **[V12-3]** Barre d'actions flottante en bas de page — apparaît dès qu'au moins une case est cochée, affiche le nombre sélectionné
-- [ ] **[V12-4]** Action groupée "Archiver X documents" — archive tous les sélectionnés, met à jour stats + notifications
-- [ ] **[V12-5]** Action groupée "Supprimer X documents" — modale de confirmation, puis suppression en masse, cascade notifications
-- [ ] **[V12-6]** Mise à jour des compteurs de section et du header après action groupée (même mécanique que la suppression unitaire)
-- [ ] **[V12-7]** Désélection automatique après action effectuée
-- [ ] **[V12-8]** Ajout depuis les tableaux des Types, Tags, Correspondant avec un petit "+" (pas de création à la volée, juste ajout)
+- [x] **[V12-1]** Colonne checkbox à gauche des tableaux (vue année + vue documents) — sélection individuelle
+- [x] **[V12-2]** Checkbox "Sélectionner tout" dans le header de tableau — coche/décoche toute la section visible
+- [x] **[V12-3]** Barre d'actions flottante en bas de page — apparaît dès qu'au moins une case est cochée, affiche le nombre sélectionné
+- [x] **[V12-4]** Action groupée "Archiver X documents" — archive tous les sélectionnés, met à jour stats + notifications
+- [x] **[V12-5]** Action groupée "Supprimer X documents" — modale de confirmation, puis suppression en masse, cascade notifications
+- [x] **[V12-6]** Mise à jour des compteurs de section et du header après action groupée (même mécanique que la suppression unitaire)
+- [x] **[V12-7]** Désélection automatique après action effectuée
+- [ ] **[V12-8]** Ajout depuis les tableaux des Types, Tags, Correspondant avec un petit "+" — reporté à v1.4.0
 
 ---
 
-### 🔜 À faire - v1.3.0
+### ✅ Terminé - v1.3.0
 
 > Objectif : produire un récapitulatif TVA utilisable pour la déclaration trimestrielle.
 
-- [ ] **[V13-1]** Nouvel onglet "TVA" dans la page `/reports`
-- [ ] **[V13-2]** Tableau par trimestre (T1→T4) : Base HT dépenses · TVA déductible · Base HT recettes · TVA collectée · Solde net TVA
-- [ ] **[V13-3]** Ligne de total annuel en bas du tableau
-- [ ] **[V13-4]** Export CSV de ce tableau TVA (bouton dédié, distinct des exports existants)
-- [ ] **[V13-5]** Filtre par année dans l'onglet TVA (même sélecteur que les autres onglets Rapports)
+- [x] **[V13-1]** Section "TVA trimestrielle" dans la page `/reports`
+- [x] **[V13-2]** Tableau par trimestre (T1→T4) : Base HT dépenses · TVA déductible · Base HT recettes · TVA collectée · Solde net TVA
+- [x] **[V13-3]** Ligne de total annuel en bas du tableau
+- [x] **[V13-4]** Export CSV de ce tableau TVA (`GET /reports/export/tva?year=`, bouton dédié)
+- [x] **[V13-5]** Filtre par année partagé avec les autres sections de la page Rapports
 
 ---
 

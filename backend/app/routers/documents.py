@@ -24,6 +24,11 @@ from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, hash_byte
 from app.services.preview_service import delete_preview, generate_preview
 
 
+class BulkActionRequest(BaseModel):
+    ids: list[uuid.UUID]
+    archived: bool = True
+
+
 class ConvertRequest(BaseModel):
     currency: str
     amount: Decimal
@@ -385,6 +390,45 @@ async def get_document_activity(id: uuid.UUID, session: AsyncSession = Depends(g
         }
         for a in result.scalars().all()
     ]
+
+
+@router.post("/bulk-archive", status_code=200)
+async def bulk_archive(body: BulkActionRequest, session: AsyncSession = Depends(get_session)) -> dict:
+    if not body.ids:
+        return {"updated": 0}
+    result = await session.execute(
+        select(Document).options(*_with_relations).where(Document.id.in_(body.ids))
+    )
+    docs = list(result.scalars().all())
+    for doc in docs:
+        if doc.archived != body.archived:
+            doc.archived = body.archived
+            session.add(DocumentActivity(
+                document_id=doc.id,
+                event_type=ActivityEventEnum.archived if body.archived else ActivityEventEnum.unarchived,
+            ))
+    await session.commit()
+    for doc in docs:
+        await _sync_notification(doc, session)
+    return {"updated": len(docs)}
+
+
+@router.post("/bulk-delete", status_code=200)
+async def bulk_delete(body: BulkActionRequest, session: AsyncSession = Depends(get_session)) -> dict:
+    if not body.ids:
+        return {"deleted": 0}
+    result = await session.execute(
+        select(Document).where(Document.id.in_(body.ids))
+    )
+    docs = list(result.scalars().all())
+    file_paths = [(doc.file_path, doc.id) for doc in docs]
+    for doc in docs:
+        await session.delete(doc)
+    await session.commit()
+    for file_path, doc_id in file_paths:
+        delete_file(file_path)
+        delete_preview(doc_id)
+    return {"deleted": len(docs)}
 
 
 @router.delete("/{id}", status_code=204)
