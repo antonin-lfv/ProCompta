@@ -20,7 +20,7 @@
   <a href="#️-stack">Stack</a>
 </p>
 
-> [!NOTE]
+> [!IMPORTANT]
 > ProCompta est un projet personnel, pas un logiciel de comptabilité professionnel. Il est conçu pour aider à suivre sa propre compta simplement - il ne remplace pas un expert-comptable ni un ERP.
 
 ## Aperçu
