@@ -28,7 +28,7 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8001}:8000"
     volumes:
       - ./storage:/app/storage
       - ./backups:/app/backups
