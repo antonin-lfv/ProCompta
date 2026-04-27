@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
@@ -50,6 +51,8 @@ async def update_identity(
     if name:
         user.name = name
     if email:
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            return RedirectResponse("/profile?error=invalid_email", status_code=303)
         user.email = email
     await session.commit()
     return RedirectResponse("/profile?success=identity", status_code=303)

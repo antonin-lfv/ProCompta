@@ -20,6 +20,8 @@
   <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">Les mots de passe ne correspondent pas.</div>
   {% elif error == 'password_too_short' %}
   <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">Le mot de passe doit faire au moins 8 caractères.</div>
+  {% elif error == 'invalid_email' %}
+  <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">L'adresse e-mail saisie n'est pas valide.</div>
   {% endif %}
 
   <!-- Identité -->

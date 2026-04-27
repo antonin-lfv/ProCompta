@@ -1,3 +1,4 @@
+import asyncio
 import subprocess
 import tempfile
 import uuid
@@ -252,7 +253,24 @@ async def upload_document(
     if mime not in ALLOWED_MIME_TYPES:
         raise HTTPException(status_code=400, detail="Seuls les PDF et images (JPG, PNG) sont acceptés")
 
-    content = await file.read()
+    _MAX_DOC_SIZE = 50 * 1024 * 1024  # 50 Mo
+    content = b""
+    async for chunk in file:
+        content += chunk
+        if len(content) > _MAX_DOC_SIZE:
+            raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 50 Mo)")
+
+    if not content:
+        raise HTTPException(status_code=400, detail="Le fichier est vide")
+
+    _MAGIC = {
+        "application/pdf": b"%PDF",
+        "image/jpeg": b"\xff\xd8\xff",
+        "image/png": b"\x89PNG",
+    }
+    if content[:4] != _MAGIC.get(mime, b""):
+        raise HTTPException(status_code=400, detail="Le contenu du fichier ne correspond pas à son type déclaré")
+
     file_hash = hash_bytes(content)
     file_size = len(content)
 
@@ -265,11 +283,15 @@ async def upload_document(
 
     pdf_date = None
     if mime == "application/pdf":
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
-        pdf_date = _extract_pdf_date(tmp_path)
-        Path(tmp_path).unlink(missing_ok=True)
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            pdf_date = _extract_pdf_date(tmp_path)
+        finally:
+            if tmp_path:
+                Path(tmp_path).unlink(missing_ok=True)
 
     doc_date = pdf_date or date.today()
     file_path = await save_file_bytes(content, document_id, doc_date, stem, mime)
@@ -281,7 +303,7 @@ async def upload_document(
         pass
 
     detected: dict = {}
-    text = _extract_document_text(full_path, mime)
+    text = await asyncio.to_thread(_extract_document_text, full_path, mime)
     if text:
         detected = await _auto_detect_fields(text, session)
 
