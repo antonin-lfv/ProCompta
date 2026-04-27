@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/logo.png" alt="ProCompta" width="100px"/>
+</p>
+
 <h1 align="center">
   <br>
   ProCompta
@@ -25,14 +29,15 @@
 ## Aperçu
 
 <p align="center">
-  <img src="images/dashboard_1.png" alt="" width="800">
+  <img src="images/dashboard_1.png" alt="Dashboard 1" width="49%">
+  <img src="images/dashboard_2.png" alt="Dashboard 2" width="49%">
 </p>
 
 ---
 
 ## À quoi ça sert
 
-ProCompta est un logiciel **auto-hébergé** pour gérer vos documents comptables (factures, relevés, contrats, bulletins de salaire…). Tout tourne en local sur votre machine via Docker — vos fichiers ne quittent jamais votre ordinateur.
+ProCompta est un logiciel **auto-hébergé** pour gérer vos documents comptables (factures, relevés, contrats, bulletins de salaire…). Tout tourne en local sur votre machine via Docker - vos fichiers ne quittent jamais votre ordinateur.
 
 Il s'adresse aux **indépendants, micro-entrepreneurs et petites structures** qui veulent un outil simple pour :
 
@@ -60,7 +65,7 @@ Le script fait tout automatiquement :
 2. Demande votre prénom, e-mail et mot de passe
 3. Génère une `SECRET_KEY` et un mot de passe PostgreSQL aléatoires
 4. Crée les dossiers `storage/` (documents) et `backups/`
-5. Propose de configurer le domaine local `http://procompta.local` (optionnel — nécessite sudo)
+5. Propose de configurer le domaine local `http://procompta.local` (optionnel - nécessite sudo)
 6. Construit les images Docker et applique les migrations de base de données
 
 À la fin, l'URL et vos identifiants s'affichent dans le terminal.
@@ -71,52 +76,82 @@ Le script fait tout automatiquement :
 
 ## 📋 Utilisation au quotidien
 
-### Ajouter un document
+<br>
 
-Cliquez sur **Nouveau** (ou appuyez sur `N`), puis glissez-déposez un fichier PDF, JPEG ou PNG.
+<p align="left">
+  <img src="images/edition.png" alt="Ajouter et éditer un document" width="420px" align="right"/>
 
-ProCompta détecte automatiquement :
-- **La date** du document (depuis les métadonnées PDF)
-- **Le correspondant** (en cherchant son nom dans le texte du document)
-- **Le type de document** (facture, devis, contrat… en français et en anglais)
+  <strong>📄 Ajouter et éditer un document</strong>
+  <br><br>
 
-Pour les images, une analyse OCR est effectuée automatiquement.
+  Cliquez sur <strong>Nouveau</strong> (ou appuyez sur <code>N</code>), puis glissez-déposez un fichier PDF, JPEG ou PNG. ProCompta détecte automatiquement la date, le correspondant et le type de document. Pour les images, une analyse OCR est effectuée automatiquement.
 
-Vous pouvez ensuite compléter les informations manuellement : montant HT/TVA/TTC, devise, catégorie (dépense / recette / autre), tags.
+  <br><br>
 
-### Importer plusieurs fichiers d'un coup
+  Complétez ensuite les informations manuellement : montant HT/TVA/TTC, devise, catégorie (dépense / recette / autre), tags. Utilisez l'import par lot pour uploader plusieurs fichiers en une seule fois - les doublons sont détectés automatiquement par hash SHA-256.
 
-Utilisez l'import par lot (bouton **Importer**) pour uploader plusieurs fichiers en une seule fois. Chaque fichier est traité indépendamment — les doublons sont détectés automatiquement.
+  <br clear="all"/>
+</p>
 
-### Naviguer dans vos documents
+<br>
 
-- **Tableau de bord** : vue d'ensemble de l'année en cours — totaux dépenses/recettes, documents récents, alertes documents incomplets
-- **Vue par année** : tous les documents d'une année, avec filtres et tri
-- **Tous les documents** : vue globale avec recherche, filtres par correspondant / type / tags / catégorie
+<p align="left">
+  <img src="images/annee.png" alt="Vue par année" width="420px" align="left"/>
 
-### Suivre les finances
+  <strong>📅 Vue par année</strong>
+  <br><br>
 
-Chaque document peut avoir :
-- Un montant HT, un taux de TVA (calculé automatiquement), un montant TTC
-- Une devise étrangère — conversion automatique vers € via les taux BCE à la date du document
+  Consultez tous les documents d'une année dans un tableau filtrable et triable. Filtres disponibles par correspondant, type de document, catégorie, tags, montant et date. Chaque ligne donne accès à la prévisualisation intégrée du fichier.
 
-### Rapports
+  <br><br>
 
-La page **Rapports** affiche pour l'année sélectionnée :
-- Bilan mensuel (dépenses vs recettes)
-- Répartition par type de document
-- **TVA trimestrielle** : base HT, TVA déductible (dépenses), TVA collectée (recettes), solde net par trimestre
-- Export CSV du bilan et de la liste des documents
+  Sélectionnez plusieurs documents via les cases à cocher pour les <strong>archiver</strong>, <strong>désarchiver</strong> ou <strong>supprimer</strong> en une seule action groupée.
 
-### Actions groupées
+  <br clear="all"/>
+</p>
 
-Sélectionnez plusieurs documents dans le tableau (cases à cocher) pour les **archiver**, **désarchiver** ou **supprimer** en une seule action.
+<br>
 
-### Sauvegarder et restaurer
+<p align="left">
+  <img src="images/toutes_annees.png" alt="Toutes les années" width="420px" align="right"/>
 
-Page **Profil** → section Backup :
-- **Télécharger** : génère un ZIP contenant le dump SQL et tous vos fichiers
-- **Restaurer** : importe un ZIP de backup (confirmation par mot de passe requise)
+  <strong>🗂️ Vue globale - toutes les années</strong>
+  <br><br>
+
+  Accédez à la liste complète des années enregistrées avec leurs statistiques : nombre de documents, total dépenses et recettes. Un point d'entrée rapide pour naviguer vers une année spécifique ou avoir une vision d'ensemble de votre activité.
+
+  <br clear="all"/>
+</p>
+
+<br>
+
+<p align="left">
+  <img src="images/rapports_1.png" alt="Rapports et finances" width="420px" align="left"/>
+
+  <strong>📊 Rapports & finances</strong>
+  <br><br>
+
+  La page Rapports affiche pour l'année sélectionnée : bilan mensuel dépenses/recettes, répartition par type de document et <strong>TVA trimestrielle</strong> (base HT, TVA déductible, TVA collectée, solde net par trimestre).
+
+  <br><br>
+
+  Les devises étrangères sont converties en € via les taux BCE à la date du document. Export CSV disponible pour le bilan comptable, la TVA trimestrielle et la liste des documents.
+
+  <br clear="all"/>
+</p>
+
+<br>
+
+<p align="left">
+  <img src="images/profil.png" alt="Profil et backup" width="420px" align="right"/>
+
+  <strong>👤 Profil & Backup</strong>
+  <br><br>
+
+  La page Profil centralise vos informations personnelles et la gestion des sauvegardes. <strong>Téléchargez</strong> un ZIP contenant le dump SQL et tous vos fichiers, ou <strong>restaurez</strong> une sauvegarde existante (confirmation par mot de passe requise).
+
+  <br clear="all"/>
+</p>
 
 ---
 

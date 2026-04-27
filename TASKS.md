@@ -1,6 +1,6 @@
 # ProCompta - Suivi des tâches
 
-## Version courante : `v1.3.0` ✅ — Prochaine : `v1.4.0`
+## Version courante : `v1.3.0` ✅ - Prochaine : `v1.4.0`
 
 ---
 
@@ -219,12 +219,12 @@
 > Objectif : importer un lot de documents en une seule opération.
 
 - [x] **[V11-1]** Input file passe en `multiple` sur la zone d'upload (vue année + raccourci `N`)
-- [x] **[V11-2]** Modale carousel — une fichier à la fois, preview à gauche (image native via FileReader, PDF via `URL.createObjectURL` + `<embed>`), formulaire complet à droite
+- [x] **[V11-2]** Modale carousel - une fichier à la fois, preview à gauche (image native via FileReader, PDF via `URL.createObjectURL` + `<embed>`), formulaire complet à droite
 - [x] **[V11-3]** Bouton "Retirer" sur chaque fichier dans la modale avant confirmation
 - [x] **[V11-4]** Navigation ← → entre les fichiers (flèches cliquables + raccourcis clavier ArrowLeft/ArrowRight), barre de progression carousel
 - [x] **[V11-5]** Formulaire complet par fichier : titre, date, catégorie, correspondant, type, tags, montants (HT / TVA / TTC / devise / équivalent EUR), date de paiement
-- [x] **[V11-6]** Conversion BCE intégrée — bouton rotatif à côté du champ EUR, appel `POST /api/documents/convert-currency` (endpoint générique sans doc ID), taux historique BCE à la date de paiement ou du jour
-- [x] **[V11-7]** Bouton "Importer N fichiers" — traitement séquentiel (upload + PATCH métadonnées), barre de progression (X / N), résumé final importés · doublons · erreurs
+- [x] **[V11-6]** Conversion BCE intégrée - bouton rotatif à côté du champ EUR, appel `POST /api/documents/convert-currency` (endpoint générique sans doc ID), taux historique BCE à la date de paiement ou du jour
+- [x] **[V11-7]** Bouton "Importer N fichiers" - traitement séquentiel (upload + PATCH métadonnées), barre de progression (X / N), résumé final importés · doublons · erreurs
 - [x] **[V11-8]** Gestion des doublons dans le batch : fichier ignoré + badge "doublon" dans le résumé
 - [x] **[V11-9]** Notifications créées automatiquement via le endpoint upload existant (comportement inchangé)
 - [x] **[V11-10]** Objets `File` natifs hors du state réactif Alpine (closure `_rawFiles`) pour éviter la corruption du proxy Proxy/ES6 sur les propriétés non-configurables
@@ -236,14 +236,14 @@
 
 > Objectif : agir sur plusieurs documents à la fois.
 
-- [x] **[V12-1]** Colonne checkbox à gauche des tableaux (vue année + vue documents) — sélection individuelle
-- [x] **[V12-2]** Checkbox "Sélectionner tout" dans le header de tableau — coche/décoche toute la section visible
-- [x] **[V12-3]** Barre d'actions flottante en bas de page — apparaît dès qu'au moins une case est cochée, affiche le nombre sélectionné
-- [x] **[V12-4]** Action groupée "Archiver X documents" — archive tous les sélectionnés, met à jour stats + notifications
-- [x] **[V12-5]** Action groupée "Supprimer X documents" — modale de confirmation, puis suppression en masse, cascade notifications
+- [x] **[V12-1]** Colonne checkbox à gauche des tableaux (vue année + vue documents) - sélection individuelle
+- [x] **[V12-2]** Checkbox "Sélectionner tout" dans le header de tableau - coche/décoche toute la section visible
+- [x] **[V12-3]** Barre d'actions flottante en bas de page - apparaît dès qu'au moins une case est cochée, affiche le nombre sélectionné
+- [x] **[V12-4]** Action groupée "Archiver X documents" - archive tous les sélectionnés, met à jour stats + notifications
+- [x] **[V12-5]** Action groupée "Supprimer X documents" - modale de confirmation, puis suppression en masse, cascade notifications
 - [x] **[V12-6]** Mise à jour des compteurs de section et du header après action groupée (même mécanique que la suppression unitaire)
 - [x] **[V12-7]** Désélection automatique après action effectuée
-- [ ] **[V12-8]** Ajout depuis les tableaux des Types, Tags, Correspondant avec un petit "+" — reporté à v1.4.0
+- [ ] **[V12-8]** Ajout depuis les tableaux des Types, Tags, Correspondant avec un petit "+" - reporté à v1.4.0
 
 ---
 

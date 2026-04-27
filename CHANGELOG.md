@@ -3,8 +3,8 @@
 ## [1.3.0] - 2026-04-27
 
 ### Ajouté
-- **TVA trimestrielle** — nouvelle section dans `/reports` affichant T1→T4 : Base HT dépenses, TVA déductible, Base HT recettes, TVA collectée, Solde net TVA, avec ligne de total annuel
-- **Export CSV TVA** — `GET /reports/export/tva?year=` dédié avec colonnes par trimestre + ligne de total
+- **TVA trimestrielle** - nouvelle section dans `/reports` affichant T1→T4 : Base HT dépenses, TVA déductible, Base HT recettes, TVA collectée, Solde net TVA, avec ligne de total annuel
+- **Export CSV TVA** - `GET /reports/export/tva?year=` dédié avec colonnes par trimestre + ligne de total
 
 ### Technique
 - Query SQLAlchemy groupée par trimestre (`extract("quarter", ...)`) pour agréger HT et TVA par catégorie
@@ -15,34 +15,34 @@
 ## [1.2.0] - 2026-04-27
 
 ### Ajouté
-- **Sélection groupée** — colonne checkbox dans tous les tableaux (vue année + vue documents), checkbox "sélectionner tout" par section
-- **Barre d'actions flottante** — apparaît dès qu'un document est coché, affiche le nombre sélectionné, actions Archiver et Supprimer ; téléportée au `<body>` via `x-teleport`
-- **Archivage groupé** — `POST /api/documents/bulk-archive` : archive tous les documents sélectionnés, log d'activité et sync notifications
-- **Suppression groupée** — `POST /api/documents/bulk-delete` : modale de confirmation, supprime les fichiers physiques et previews, met à jour les compteurs de section
+- **Sélection groupée** - colonne checkbox dans tous les tableaux (vue année + vue documents), checkbox "sélectionner tout" par section
+- **Barre d'actions flottante** - apparaît dès qu'un document est coché, affiche le nombre sélectionné, actions Archiver et Supprimer ; téléportée au `<body>` via `x-teleport`
+- **Archivage groupé** - `POST /api/documents/bulk-archive` : archive tous les documents sélectionnés, log d'activité et sync notifications
+- **Suppression groupée** - `POST /api/documents/bulk-delete` : modale de confirmation, supprime les fichiers physiques et previews, met à jour les compteurs de section
 - Désélection automatique après action ; sélection nettoyée sur suppression individuelle via événement `doc-deleted`
 
 ### Technique
-- `BulkActionRequest` — nouveau schéma Pydantic `{ ids: list[uuid] }`
+- `BulkActionRequest` - nouveau schéma Pydantic `{ ids: list[uuid] }`
 - `yearData()` étendu avec `selectedIds[]`, `toggleSelect`, `toggleSelectAll`, `areAllSelected`, `clearSelection`, `bulkArchive`, `bulkDelete`
-- `docsData()` — nouveau composant Alpine sur `/documents` unifiant `showFilters` et la sélection groupée
+- `docsData()` - nouveau composant Alpine sur `/documents` unifiant `showFilters` et la sélection groupée
 
 ---
 
 ## [1.1.0] - 2026-04-26
 
 ### Ajouté
-- **Import batch — modale carousel** — sélection multiple de fichiers (PDF, JPEG, PNG) ; modale plein-écran téléportée au `<body>` (`x-teleport`) pour éviter tout conflit de stacking context ; un fichier à la fois avec barre de progression carousel
-- **Preview dans le carousel** — images rendues via FileReader (data URL), PDFs via `URL.createObjectURL` + `<embed>` natif ; nettoyage automatique des object URLs à la fermeture
-- **Formulaire complet par fichier** — titre, date document, catégorie (Dépense / Recette / Autre), correspondant, type de document, tags, montants (HT / TVA / TTC / devise), date de paiement
-- **Conversion BCE intégrée dans le batch** — bouton rotatif à côté du champ "Équivalent EUR", taux historique BCE à la date de paiement (ou du jour) ; nouvel endpoint générique `POST /api/documents/convert-currency` (sans doc ID requis)
-- **Traitement séquentiel avec résumé** — upload + PATCH métadonnées pour chaque fichier, barre de progression X/N, résumé final (importés · doublons · erreurs)
-- **Navigation clavier** — flèches ← → pour naviguer entre les fichiers, Échap pour fermer
+- **Import batch - modale carousel** - sélection multiple de fichiers (PDF, JPEG, PNG) ; modale plein-écran téléportée au `<body>` (`x-teleport`) pour éviter tout conflit de stacking context ; un fichier à la fois avec barre de progression carousel
+- **Preview dans le carousel** - images rendues via FileReader (data URL), PDFs via `URL.createObjectURL` + `<embed>` natif ; nettoyage automatique des object URLs à la fermeture
+- **Formulaire complet par fichier** - titre, date document, catégorie (Dépense / Recette / Autre), correspondant, type de document, tags, montants (HT / TVA / TTC / devise), date de paiement
+- **Conversion BCE intégrée dans le batch** - bouton rotatif à côté du champ "Équivalent EUR", taux historique BCE à la date de paiement (ou du jour) ; nouvel endpoint générique `POST /api/documents/convert-currency` (sans doc ID requis)
+- **Traitement séquentiel avec résumé** - upload + PATCH métadonnées pour chaque fichier, barre de progression X/N, résumé final (importés · doublons · erreurs)
+- **Navigation clavier** - flèches ← → pour naviguer entre les fichiers, Échap pour fermer
 
 ### Technique
-- `POST /api/documents/convert-currency` — endpoint générique acceptant `{ currency, amount, date? }` sans requérir un document existant
+- `POST /api/documents/convert-currency` - endpoint générique acceptant `{ currency, amount, date? }` sans requérir un document existant
 - Helper `_fetch_ecb_rate(currency, rate_date)` extrait et partagé entre les deux endpoints de conversion
 - Objets `File` natifs stockés dans une closure non-réactive (`_rawFiles`) pour éviter que le proxy Alpine 3 ne corrompe leur réactivité
-- `GenericConvertRequest` — nouveau schéma Pydantic avec champ `date` optionnel
+- `GenericConvertRequest` - nouveau schéma Pydantic avec champ `date` optionnel
 
 ---
 

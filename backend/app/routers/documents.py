@@ -39,7 +39,7 @@ class ConvertRequest(BaseModel):
 class GenericConvertRequest(BaseModel):
     currency: str
     amount: Decimal
-    date: str | None = None  # ISO date, optionnel — défaut: aujourd'hui
+    date: str | None = None  # ISO date, optionnel - défaut: aujourd'hui
 
 
 async def _fetch_ecb_rate(currency: str, rate_date: date) -> Decimal | None:
@@ -174,7 +174,7 @@ async def _auto_detect_fields(text: str, session: AsyncSession) -> dict:
     text_lower = text[:8000].lower()
     detected: dict = {}
 
-    # Correspondent — prefer longer names to reduce false positives
+    # Correspondent - prefer longer names to reduce false positives
     corr_rows = (await session.execute(
         select(Correspondent).order_by(func.length(Correspondent.name).desc())
     )).scalars().all()
@@ -183,7 +183,7 @@ async def _auto_detect_fields(text: str, session: AsyncSession) -> dict:
             detected["correspondent_id"] = corr.id
             break
 
-    # Document type — check French name then English synonyms
+    # Document type - check French name then English synonyms
     dt_rows = (await session.execute(
         select(DocumentType).order_by(func.length(DocumentType.name).desc())
     )).scalars().all()
@@ -409,7 +409,7 @@ async def get_document_file(id: uuid.UUID, request: Request, session: AsyncSessi
 
 @router.post("/convert-currency")
 async def convert_currency_generic(body: GenericConvertRequest) -> dict:
-    """Conversion BCE sans document — utilisé par l'import batch."""
+    """Conversion BCE sans document - utilisé par l'import batch."""
     if body.currency == "EUR":
         return {"amount_eur": str(body.amount)}
     today = date.today()

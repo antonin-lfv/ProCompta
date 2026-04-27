@@ -55,7 +55,7 @@ function deleteDocRow(docId) {
 }
 
 function yearData() {
-  // Les objets File natifs ne sont pas proxyables par Alpine — on les garde hors du state réactif
+  // Les objets File natifs ne sont pas proxyables par Alpine - on les garde hors du state réactif
   let _rawFiles = [];
 
   return {
@@ -720,7 +720,7 @@ function yearData() {
   {% endif %}
 
 
-  <!-- Batch Upload Modal — teleporté au <body> pour éviter tout conflit de stacking context -->
+  <!-- Batch Upload Modal - teleporté au <body> pour éviter tout conflit de stacking context -->
   <template x-teleport="body">
   <div
     x-show="batchModal"
@@ -769,7 +769,7 @@ function yearData() {
                  class="max-h-52 max-w-full rounded-lg object-contain shadow" alt="">
           </div>
 
-          <!-- PDF — rendu natif via embed -->
+          <!-- PDF - rendu natif via embed -->
           <div x-show="batchFiles[batchIdx]?.previewKind === 'pdf'" class="w-full h-full">
             <embed :src="batchFiles[batchIdx]?.previewUrl || ''" type="application/pdf"
                    class="w-full h-full" style="min-height:220px">

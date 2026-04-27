@@ -783,7 +783,7 @@ async def reports(
         for name, data in sorted(_corr_pivot.items(), key=lambda x: x[0].lower())
     ]
 
-    # TVA par trimestre — toujours sur l'année complète (T1→T4)
+    # TVA par trimestre - toujours sur l'année complète (T1→T4)
     _base_year = [extract("year", Document.document_date) == year, Document.archived == False]
     tva_q_result = await session.execute(
         select(
