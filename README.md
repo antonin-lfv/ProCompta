@@ -25,7 +25,7 @@
 ## Aperçu
 
 <p align="center">
-<img width="1624" height="1062" alt="main_page" src="https://github.com/user-attachments/assets/b4957d8f-c601-4096-aab9-f4f27d76961d" />
+  <img src="images/dashboard_1.png" alt="" width="800">
 </p>
 
 ---
