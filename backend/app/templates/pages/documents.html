@@ -83,9 +83,10 @@ function docsData() {
         body: JSON.stringify({ ids }),
       });
       if (resp.ok) {
-        ids.forEach(id => deleteDocInList(id));
-        this.selectedIds = [];
+        window.location.reload();
+      } else {
         this.showBulkDeleteConfirm = false;
+        alert('Erreur lors de la suppression. Veuillez réessayer.');
       }
     },
   };
@@ -356,8 +357,7 @@ function docsData() {
   </div>
   {% endif %}
 
-  <!-- Floating bulk action bar + bulk delete confirm — teleporté au <body> -->
-  <template x-teleport="body">
+  <!-- Floating bulk action bar + bulk delete confirm -->
     <div
       x-show="selectedIds.length > 0 && !showBulkDeleteConfirm"
       x-cloak
@@ -433,7 +433,6 @@ function docsData() {
         </div>
       </div>
     </div>
-  </template>
 
 </div>
 {% endblock %}

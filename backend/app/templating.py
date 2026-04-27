@@ -33,8 +33,10 @@ def _highlight(text: str | None, search: str | None) -> Markup:
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.filters["date_fr"] = _date_fr
 templates.env.filters["highlight"] = _highlight
+app_version = "1.3.0"
+
 templates.env.globals.update({
-    "app_version": "1.3.0",
+    "app_version": app_version,
     "current_year": date.today().year,
 })
 

@@ -221,8 +221,8 @@ function yearData() {
                 title: item.title || item.name,
                 document_date: item.date || this.todayISO,
                 category: item.category || 'autre',
-                correspondent_id: item.correspondent_id || null,
-                document_type_id: item.document_type_id || null,
+                correspondent_id: item.correspondent_id || doc.correspondent_id || null,
+                document_type_id: item.document_type_id || doc.document_type_id || null,
                 tag_ids: item.tag_ids || [],
                 currency: item.currency || 'EUR',
                 amount_ht: item.category !== 'autre' && item.amount_ht !== '' ? parseFloat(item.amount_ht) : null,
@@ -326,10 +326,10 @@ function yearData() {
         body: JSON.stringify({ ids }),
       });
       if (resp.ok) {
-        ids.forEach(id => deleteDocRow(id));
-        this.selectedIds = [];
+        window.location.reload();
+      } else {
         this.showBulkDeleteConfirm = false;
-        window.dispatchEvent(new CustomEvent('notif-changed', { detail: null }));
+        alert('Erreur lors de la suppression. Veuillez réessayer.');
       }
     },
   };
@@ -747,7 +747,8 @@ function yearData() {
       </div>
 
       <!-- ── ÉTAT : editing ── -->
-      <div x-show="batchState === 'editing'" class="flex flex-1 min-h-0 overflow-hidden">
+      <template x-if="batchState === 'editing' && batchFiles.length > 0">
+      <div class="flex flex-1 min-h-0 overflow-hidden">
 
         <!-- Panneau preview -->
         <div class="w-44 shrink-0 border-r border-slate-100 flex flex-col items-center justify-center bg-slate-50 overflow-hidden">
@@ -812,7 +813,7 @@ function yearData() {
             <label class="block text-xs font-medium text-slate-600 mb-1">Correspondant</label>
             <select x-model="batchFiles[batchIdx].correspondent_id"
                     class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-              <option value="">— Aucun —</option>
+              <option value=""></option>
               <template x-for="c in correspondents" :key="c.id">
                 <option :value="c.id" x-text="c.name"></option>
               </template>
@@ -824,7 +825,7 @@ function yearData() {
             <label class="block text-xs font-medium text-slate-600 mb-1">Type de document</label>
             <select x-model="batchFiles[batchIdx].document_type_id"
                     class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-              <option value="">— Aucun —</option>
+              <option value=""></option>
               <template x-for="dt in docTypes" :key="dt.id">
                 <option :value="dt.id" x-text="dt.name"></option>
               </template>
@@ -923,6 +924,7 @@ function yearData() {
 
         </div>
       </div>
+      </template>
 
       <!-- ── ÉTAT : uploading ── -->
       <div x-show="batchState === 'uploading'" class="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
@@ -1049,8 +1051,7 @@ function yearData() {
   </div>
   </template>
 
-  <!-- Floating bulk action bar + bulk delete confirm — teleporté au <body> -->
-  <template x-teleport="body">
+  <!-- Floating bulk action bar + bulk delete confirm -->
     <!-- Barre flottante -->
     <div
       x-show="selectedIds.length > 0 && !showBulkDeleteConfirm"
@@ -1128,7 +1129,6 @@ function yearData() {
         </div>
       </div>
     </div>
-  </template>
 
 </div>
 {% endblock %}

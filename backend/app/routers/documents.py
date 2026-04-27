@@ -8,15 +8,17 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
-from sqlalchemy import extract, select
+from sqlalchemy import extract, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_session
+from app.models.correspondent import Correspondent
 from app.models.document import CategoryEnum, Document, document_tags
 from app.models.document_activity import ActivityEventEnum, DocumentActivity
+from app.models.document_type import DocumentType
 from app.models.notification import Notification, NotificationTypeEnum
 from app.models.tag import Tag
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
@@ -118,6 +120,83 @@ async def _sync_notification(doc: Document, session: AsyncSession) -> None:
     await session.commit()
 
 
+# Synonymes anglais pour les types de document courants
+_TYPE_SYNONYMS: dict[str, list[str]] = {
+    "facture":              ["invoice", "bill"],
+    "devis":                ["quote", "quotation", "estimate"],
+    "contrat":              ["contract", "agreement"],
+    "bon de commande":      ["purchase order", "order form"],
+    "relevé":               ["statement", "account statement"],
+    "reçu":                 ["receipt"],
+    "bulletin de salaire":  ["payslip", "pay slip", "payroll"],
+    "rapport":              ["report"],
+    "avenant":              ["amendment", "addendum"],
+    "attestation":          ["certificate", "certification"],
+    "avoir":                ["credit note", "credit memo"],
+    "bordereau":            ["remittance", "slip"],
+}
+
+
+def _extract_pdf_text(file_path: str) -> str:
+    try:
+        result = subprocess.run(
+            ["pdftotext", "-q", file_path, "-"],
+            capture_output=True, text=True, timeout=15,
+        )
+        return result.stdout
+    except Exception:
+        return ""
+
+
+def _extract_image_text(file_path: str) -> str:
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(file_path)
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        return pytesseract.image_to_string(img, lang="fra+eng")
+    except Exception:
+        return ""
+
+
+def _extract_document_text(file_path: str, mime: str) -> str:
+    if mime == "application/pdf":
+        return _extract_pdf_text(file_path)
+    if mime in ("image/jpeg", "image/png"):
+        return _extract_image_text(file_path)
+    return ""
+
+
+async def _auto_detect_fields(text: str, session: AsyncSession) -> dict:
+    if not text.strip():
+        return {}
+    text_lower = text[:8000].lower()
+    detected: dict = {}
+
+    # Correspondent — prefer longer names to reduce false positives
+    corr_rows = (await session.execute(
+        select(Correspondent).order_by(func.length(Correspondent.name).desc())
+    )).scalars().all()
+    for corr in corr_rows:
+        if len(corr.name) >= 3 and corr.name.lower() in text_lower:
+            detected["correspondent_id"] = corr.id
+            break
+
+    # Document type — check French name then English synonyms
+    dt_rows = (await session.execute(
+        select(DocumentType).order_by(func.length(DocumentType.name).desc())
+    )).scalars().all()
+    for dt in dt_rows:
+        name_lower = dt.name.lower()
+        synonyms = _TYPE_SYNONYMS.get(name_lower, [])
+        if name_lower in text_lower or any(s in text_lower for s in synonyms):
+            detected["document_type_id"] = dt.id
+            break
+
+    return detected
+
+
 def _extract_pdf_date(file_path: str) -> date | None:
     try:
         result = subprocess.run(
@@ -201,6 +280,11 @@ async def upload_document(
     except Exception:
         pass
 
+    detected: dict = {}
+    text = _extract_document_text(full_path, mime)
+    if text:
+        detected = await _auto_detect_fields(text, session)
+
     doc = Document(
         id=document_id,
         title=stem,
@@ -209,21 +293,17 @@ async def upload_document(
         mime_type=mime,
         file_size=file_size,
         document_date=doc_date,
+        correspondent_id=detected.get("correspondent_id"),
+        document_type_id=detected.get("document_type_id"),
     )
     session.add(doc)
-    await session.commit()
-
-    session.add(Notification(
-        type=NotificationTypeEnum.incomplete_document,
-        document_id=document_id,
-        title=f"« {stem} » importé - à compléter",
-        body="Sans correspondant · Sans type",
-    ))
     session.add(DocumentActivity(
         document_id=document_id,
         event_type=ActivityEventEnum.uploaded,
     ))
     await session.commit()
+
+    await _sync_notification(doc, session)
 
     return await _get_doc_or_404(session, document_id)
 

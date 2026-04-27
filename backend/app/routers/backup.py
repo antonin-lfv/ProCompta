@@ -8,10 +8,8 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import get_session
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.services.auth_service import verify_password
@@ -74,7 +72,6 @@ async def restore_backup(
     request: Request,
     file: UploadFile = File(...),
     password: str = Form(...),
-    session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> dict:
     if not verify_password(password, user.hashed_password):

@@ -34,10 +34,10 @@ async def mark_all_read(session: AsyncSession = Depends(get_session)) -> dict:
 @router.get("", response_model=list[NotificationResponse])
 async def list_notifications(
     read: bool | None = None,
-    limit: int = 50,
+    limit: int = 50,  # capped at 200
     session: AsyncSession = Depends(get_session),
 ) -> list[Notification]:
-    stmt = select(Notification).order_by(Notification.created_at.desc()).limit(limit)
+    stmt = select(Notification).order_by(Notification.created_at.desc()).limit(min(limit, 200))
     if read is not None:
         stmt = stmt.where(Notification.read == read)
     result = await session.execute(stmt)
