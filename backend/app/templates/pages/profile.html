@@ -89,7 +89,7 @@
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1.5">Devise par défaut</label>
           <select name="default_currency"
-                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                  class="w-full h-9 bg-white border border-slate-300 rounded-lg px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
             {% for c in currencies %}
             <option value="{{ c }}" {% if user.default_currency == c %}selected{% endif %}>{{ c }}</option>
             {% endfor %}
@@ -98,7 +98,7 @@
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1.5">Début de l'exercice fiscal</label>
           <select name="fiscal_year_start"
-                  class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                  class="w-full h-9 bg-white border border-slate-300 rounded-lg px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
             {% for m in months %}
             <option value="{{ loop.index }}" {% if user.fiscal_year_start == loop.index %}selected{% endif %}>{{ m }}</option>
             {% endfor %}
