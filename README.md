@@ -80,8 +80,6 @@ Le script fait tout automatiquement :
 
   Cliquez sur <strong>Nouveau</strong> (ou appuyez sur <code>N</code>), puis glissez-déposez un fichier PDF, JPEG ou PNG. ProCompta détecte automatiquement la date, le correspondant et le type de document. Pour les images, une analyse OCR est effectuée automatiquement.
 
-  <br><br>
-
   Complétez ensuite les informations manuellement : montant HT/TVA/TTC, devise, catégorie (dépense / recette / autre), tags. Utilisez l'import par lot pour uploader plusieurs fichiers en une seule fois - les doublons sont détectés automatiquement par hash SHA-256.
 
   <br clear="all"/>
@@ -97,7 +95,6 @@ Le script fait tout automatiquement :
 
   Consultez tous les documents d'une année dans un tableau filtrable et triable. Filtres disponibles par correspondant, type de document, catégorie, tags, montant et date. Chaque ligne donne accès à la prévisualisation intégrée du fichier.
 
-  <br><br>
 
   Sélectionnez plusieurs documents via les cases à cocher pour les <strong>archiver</strong>, <strong>désarchiver</strong> ou <strong>supprimer</strong> en une seule action groupée.
 
@@ -126,8 +123,6 @@ Le script fait tout automatiquement :
   <br><br>
 
   La page Rapports affiche pour l'année sélectionnée : bilan mensuel dépenses/recettes, répartition par type de document et <strong>TVA trimestrielle</strong> (base HT, TVA déductible, TVA collectée, solde net par trimestre).
-
-  <br><br>
 
   Les devises étrangères sont converties en € via les taux BCE à la date du document. Export CSV disponible pour le bilan comptable, la TVA trimestrielle et la liste des documents.
 
