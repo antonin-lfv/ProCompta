@@ -82,8 +82,12 @@ async def seed_defaults() -> None:
 
 
 _ERROR_MESSAGES = {
-    404: ("Page introuvable", "La page que vous cherchez n'existe pas ou a été déplacée."),
+    400: ("Requête invalide", "Les données envoyées sont incorrectes ou incomplètes."),
     403: ("Accès refusé", "Vous n'avez pas les droits pour accéder à cette ressource."),
+    404: ("Page introuvable", "La page que vous cherchez n'existe pas ou a été déplacée."),
+    405: ("Méthode non autorisée", "Cette action n'est pas permise sur cette ressource."),
+    413: ("Fichier trop volumineux", "Le fichier envoyé dépasse la taille maximale autorisée."),
+    422: ("Données invalides", "Le format des données envoyées n'est pas correct."),
     500: ("Erreur serveur", "Une erreur inattendue s'est produite. Réessayez dans un moment."),
 }
 
@@ -98,6 +102,19 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         "pages/error.html",
         {"status_code": exc.status_code, "title": title, "message": message},
         status_code=exc.status_code,
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    if request.url.path.startswith("/api"):
+        return JSONResponse(status_code=500, content={"detail": "Erreur serveur interne"})
+    title, message = _ERROR_MESSAGES[500]
+    return templates.TemplateResponse(
+        request,
+        "pages/error.html",
+        {"status_code": 500, "title": title, "message": message},
+        status_code=500,
     )
 
 

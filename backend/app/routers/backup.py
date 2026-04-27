@@ -1,5 +1,4 @@
 import io
-import shutil
 import subprocess
 import zipfile
 from datetime import datetime
@@ -16,6 +15,9 @@ from app.models.user import User
 from app.services.auth_service import verify_password
 
 router = APIRouter(prefix="/backup", tags=["backup"])
+
+_MAX_BACKUP_SIZE = 500 * 1024 * 1024  # 500 Mo
+_ZIP_MAGIC = b"PK\x03\x04"
 
 
 def _parse_db_url() -> dict:
@@ -76,17 +78,44 @@ async def restore_backup(
     password: str = Form(...),
 ) -> dict:
     user: User = request.state.user
+
+    if not password:
+        raise HTTPException(status_code=400, detail="Le mot de passe est requis")
+
     if not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=403, detail="Mot de passe incorrect")
 
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Aucun fichier fourni")
+
+    if not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Le fichier doit être un .zip")
+
     content = await file.read()
+
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Le fichier est vide")
+
+    if len(content) > _MAX_BACKUP_SIZE:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 500 Mo)")
+
+    if not content[:4] == _ZIP_MAGIC:
+        raise HTTPException(status_code=400, detail="Le fichier n'est pas un ZIP valide")
+
     try:
         zf = zipfile.ZipFile(io.BytesIO(content))
     except zipfile.BadZipFile:
-        raise HTTPException(status_code=400, detail="Fichier zip invalide")
+        raise HTTPException(status_code=400, detail="Archive ZIP corrompue ou invalide")
 
     if "database.sql" not in zf.namelist():
-        raise HTTPException(status_code=400, detail="Archive invalide (database.sql manquant)")
+        raise HTTPException(
+            status_code=400,
+            detail="Archive invalide : database.sql manquant - ce fichier n'est pas un backup ProCompta",
+        )
+
+    sql_dump = zf.read("database.sql")
+    if not sql_dump.strip():
+        raise HTTPException(status_code=400, detail="Le backup est vide (database.sql vide)")
 
     saved_user = {
         "id": user.id,
@@ -97,23 +126,30 @@ async def restore_backup(
         "fiscal_year_start": user.fiscal_year_start,
     }
 
-    sql_dump = zf.read("database.sql")
     db = _parse_db_url()
     env = _psql_env(db)
     psql_base = ["psql", "-h", db["host"], "-p", db["port"], "-U", db["user"], db["dbname"]]
 
-    clean = subprocess.run(
-        psql_base + ["-c", f"DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO {db['user']};"],
-        capture_output=True, env=env, timeout=30,
-    )
-    if clean.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"Schema reset failed: {clean.stderr.decode()}")
+    try:
+        clean = subprocess.run(
+            psql_base + ["-c", f"DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO {db['user']};"],
+            capture_output=True, env=env, timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=500, detail="Timeout lors de la réinitialisation du schéma")
 
-    restore = subprocess.run(
-        psql_base, input=sql_dump, capture_output=True, env=env, timeout=120,
-    )
+    if clean.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"Réinitialisation du schéma échouée : {clean.stderr.decode()}")
+
+    try:
+        restore = subprocess.run(
+            psql_base, input=sql_dump, capture_output=True, env=env, timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=500, detail="Timeout lors de la restauration (backup trop volumineux ?)")
+
     if restore.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"Restore failed: {restore.stderr.decode()}")
+        raise HTTPException(status_code=500, detail=f"Restauration échouée : {restore.stderr.decode()}")
 
     storage = Path(settings.storage_path)
     for name in zf.namelist():
