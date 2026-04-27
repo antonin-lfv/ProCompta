@@ -1,12 +1,6 @@
 <p align="center">
-  <img src="images/logo.png" alt="ProCompta" width="100px"/>
+  <img src="images/logo.png" alt="ProCompta" width="350px"/>
 </p>
-
-<h1 align="center">
-  <br>
-  ProCompta
-  <br>
-</h1>
 
 <h4 align="center">Gestionnaire de documents comptables · local · sans abonnement · sans cloud.</h4>
 
