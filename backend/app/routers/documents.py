@@ -254,11 +254,9 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="Seuls les PDF et images (JPG, PNG) sont acceptés")
 
     _MAX_DOC_SIZE = 50 * 1024 * 1024  # 50 Mo
-    content = b""
-    async for chunk in file:
-        content += chunk
-        if len(content) > _MAX_DOC_SIZE:
-            raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 50 Mo)")
+    content = await file.read()
+    if len(content) > _MAX_DOC_SIZE:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 50 Mo)")
 
     if not content:
         raise HTTPException(status_code=400, detail="Le fichier est vide")
