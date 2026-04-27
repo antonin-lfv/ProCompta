@@ -4,15 +4,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=["../.env", ".env"], extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://procompta:changeme@db:5432/procompta"
+    database_url: str
     storage_path: str = "/app/storage"
     backup_path: str = "/app/backups"
-    api_port: int = 8000
+    api_port: int
 
-    secret_key: str = "change-me-in-production"
-    admin_name: str = "Admin"
-    admin_email: str = "admin@procompta.local"
-    admin_password: str = "changeme"
+    secret_key: str
+    admin_name: str
+    admin_email: str
+    admin_password: str
 
 
 settings = Settings()

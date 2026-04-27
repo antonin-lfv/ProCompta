@@ -24,6 +24,11 @@ services:
     env_file: .env
     environment:
       STORAGE_PATH: /app/storage
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      ADMIN_NAME: ${ADMIN_NAME}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     dns:
       - 8.8.8.8
       - 8.8.4.4

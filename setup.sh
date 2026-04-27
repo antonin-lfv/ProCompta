@@ -63,7 +63,7 @@ POSTGRES_HOST=db
 POSTGRES_PORT=5432
 
 # API
-API_PORT=8000
+API_PORT=8001
 DATABASE_URL=postgresql+asyncpg://procompta:${PG_PASSWORD}@db:5432/procompta
 
 # Storage
@@ -107,21 +107,19 @@ info "Build et démarrage des services (première fois : quelques minutes)..."
 docker compose up --build -d
 
 # ── Attente démarrage API ─────────────────────────────────────────────────────
-info "Attente du démarrage de l'API..."
-MAX_ATTEMPTS=45
+API_PORT_VALUE=$(grep "^API_PORT=" .env | cut -d= -f2)
+API_PORT_VALUE=${API_PORT_VALUE:-8001}
+
+info "Attente du démarrage de l'API (port ${API_PORT_VALUE})..."
+MAX_ATTEMPTS=60
 attempt=0
-until curl -sf http://localhost:8000/health >/dev/null 2>&1; do
+until curl -sf "http://localhost:${API_PORT_VALUE}/health" >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   [ $attempt -ge $MAX_ATTEMPTS ] \
     && die "L'API n'a pas démarré. Consulte les logs : docker compose logs api"
-  sleep 2
+  sleep 3
 done
 success "API opérationnelle."
-
-# ── Migrations ────────────────────────────────────────────────────────────────
-info "Application des migrations de base de données..."
-docker compose exec api uv run alembic upgrade head
-success "Base de données à jour."
 
 # ── Résumé ────────────────────────────────────────────────────────────────────
 echo ""
@@ -133,7 +131,7 @@ echo ""
 if grep -q "procompta.local" /etc/hosts 2>/dev/null; then
   echo -e "  ${BOLD}URL   →  http://procompta.local${NC}"
 else
-  echo -e "  ${BOLD}URL   →  http://localhost:8000${NC}"
+  echo -e "  ${BOLD}URL   →  http://localhost:${API_PORT_VALUE}${NC}"
 fi
 
 SAVED_EMAIL=$(grep "^ADMIN_EMAIL=" .env | cut -d= -f2)

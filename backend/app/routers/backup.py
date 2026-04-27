@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
+from app.database import async_session_factory, engine
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.services.auth_service import verify_password
@@ -41,7 +42,8 @@ async def download_backup(
     db = _parse_db_url()
 
     result = subprocess.run(
-        ["pg_dump", "--clean", "--if-exists", "-h", db["host"], "-p", db["port"], "-U", db["user"], db["dbname"]],
+        ["pg_dump", "--clean", "--if-exists", "--exclude-table=users",
+         "-h", db["host"], "-p", db["port"], "-U", db["user"], db["dbname"]],
         capture_output=True,
         env=_psql_env(db),
         timeout=120,
@@ -72,8 +74,8 @@ async def restore_backup(
     request: Request,
     file: UploadFile = File(...),
     password: str = Form(...),
-    user: User = Depends(get_current_user),
 ) -> dict:
+    user: User = request.state.user
     if not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=403, detail="Mot de passe incorrect")
 
@@ -85,6 +87,15 @@ async def restore_backup(
 
     if "database.sql" not in zf.namelist():
         raise HTTPException(status_code=400, detail="Archive invalide (database.sql manquant)")
+
+    saved_user = {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "hashed_password": user.hashed_password,
+        "default_currency": user.default_currency,
+        "fiscal_year_start": user.fiscal_year_start,
+    }
 
     sql_dump = zf.read("database.sql")
     db = _parse_db_url()
@@ -113,4 +124,21 @@ async def restore_backup(
             target.write_bytes(zf.read(name))
 
     zf.close()
+
+    await engine.dispose()
+
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda c: User.__table__.create(c, checkfirst=True))
+
+    async with async_session_factory() as session:
+        session.add(User(
+            id=saved_user["id"],
+            name=saved_user["name"],
+            email=saved_user["email"],
+            hashed_password=saved_user["hashed_password"],
+            default_currency=saved_user["default_currency"],
+            fiscal_year_start=saved_user["fiscal_year_start"],
+        ))
+        await session.commit()
+
     return {"status": "ok"}
