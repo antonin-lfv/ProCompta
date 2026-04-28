@@ -266,7 +266,8 @@ async def upload_document(
         "image/jpeg": b"\xff\xd8\xff",
         "image/png": b"\x89PNG",
     }
-    if content[:4] != _MAGIC.get(mime, b""):
+    magic = _MAGIC.get(mime, b"")
+    if not content.startswith(magic):
         raise HTTPException(status_code=400, detail="Le contenu du fichier ne correspond pas à son type déclaré")
 
     file_hash = hash_bytes(content)
