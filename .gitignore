@@ -42,3 +42,6 @@ backups/*
 
 # Tailwind CSS build output
 backend/app/static/css/tailwind.css
+
+# Data
+postgres_data

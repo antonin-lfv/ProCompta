@@ -1,3 +1,4 @@
+import asyncio
 import io
 import subprocess
 import zipfile
@@ -71,16 +72,27 @@ def save_backup_to_disk() -> None:
         old.unlink()
 
 
+@router.post("/save")
+async def save_backup(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> dict:
+    try:
+        await asyncio.to_thread(save_backup_to_disk)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "ok"}
+
+
 @router.get("/download")
 async def download_backup(
     request: Request,
     user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     try:
-        data = _build_backup_bytes()
+        data = await asyncio.to_thread(_build_backup_bytes)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
-
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"procompta_backup_{timestamp}.zip"
     return StreamingResponse(

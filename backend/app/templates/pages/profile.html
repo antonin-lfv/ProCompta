@@ -123,6 +123,20 @@
          importPassword: '',
          importLoading: false,
          importError: null,
+         backupSaving: false,
+         backupMsg: null,
+         backupOpen: false,
+         async runBackup() {
+           this.backupSaving = true; this.backupMsg = null;
+           try {
+             const r = await fetch('/api/backup/save', { method: 'POST' });
+             const d = await r.json();
+             if (!r.ok) { this.backupMsg = { ok: false, text: d.detail || 'Erreur' }; return; }
+             this.backupMsg = { ok: true, text: 'Backup sauvegardé dans /backups' };
+             setTimeout(() => this.backupMsg = null, 4000);
+           } catch(e) { this.backupMsg = { ok: false, text: e.message }; }
+           finally { this.backupSaving = false; }
+         },
          async runRestore() {
            if (!this.importFile) return;
            this.importLoading = true; this.importError = null;
@@ -144,21 +158,59 @@
     <div class="px-6 py-5 space-y-5">
 
       <!-- Boutons -->
-      <div class="flex items-center gap-3">
-        <a href="/api/backup/download"
-           class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-          </svg>
-          Télécharger un backup
-        </a>
-        <button @click="showImport = !showImport"
-                class="flex items-center gap-2 px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-          </svg>
-          Importer une backup
-        </button>
+      <div class="space-y-3">
+        <div class="flex items-center gap-3">
+
+          <!-- Dropdown export -->
+          <div class="relative" @click.away="backupOpen = false">
+            <button @click="backupOpen = !backupOpen" :disabled="backupSaving"
+                    class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              <span x-text="backupSaving ? 'En cours…' : 'Exporter un backup'"></span>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 ml-0.5" :class="backupOpen ? 'rotate-180' : ''" style="transition: transform 0.15s">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            <div x-show="backupOpen" x-cloak @keydown.escape.window="backupOpen = false"
+                 class="absolute left-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-lg z-10 overflow-hidden">
+              <button @click="backupOpen = false; runBackup()"
+                      class="flex items-start gap-3 w-full px-4 py-3 hover:bg-slate-50 transition-colors text-left">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-slate-500 shrink-0 mt-0.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                </svg>
+                <div>
+                  <p class="text-sm font-medium text-slate-800">Sauvegarder sur le serveur</p>
+                  <p class="text-xs text-slate-500 mt-0.5">Enregistre dans le dossier <code class="font-mono">/backups</code></p>
+                </div>
+              </button>
+              <div class="border-t border-slate-100"></div>
+              <a href="/api/backup/download"
+                 @click="backupOpen = false"
+                 class="flex items-start gap-3 w-full px-4 py-3 hover:bg-slate-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-slate-500 shrink-0 mt-0.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                <div>
+                  <p class="text-sm font-medium text-slate-800">Télécharger</p>
+                  <p class="text-xs text-slate-500 mt-0.5">Télécharge un fichier <code class="font-mono">.zip</code> sur votre appareil</p>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <button @click="showImport = !showImport"
+                  class="flex items-center gap-2 px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            Importer une backup
+          </button>
+        </div>
+        <p x-show="backupMsg" x-cloak
+           :class="backupMsg?.ok ? 'text-green-700' : 'text-red-600'"
+           class="text-sm" x-text="backupMsg?.text"></p>
       </div>
 
       <!-- Panel import -->
