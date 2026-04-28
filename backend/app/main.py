@@ -1,3 +1,6 @@
+import asyncio
+import logging
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -13,8 +16,11 @@ from app.models.user import User
 from app.models.document_type import DocumentType
 from app.models.tag import Tag
 from app.routers import auth, backup, correspondents, document_types, documents, notifications, pages, profile, tags
+from app.routers.backup import save_backup_to_disk
 from app.services.auth_service import hash_password
 from app.templating import app_version, templates
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="ProCompta", version="0.1.0")
 
@@ -37,6 +43,21 @@ app.include_router(tags.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
+
+
+@app.on_event("startup")
+async def auto_backup() -> None:
+    backup_dir = Path(settings.backup_path)
+    existing = sorted(backup_dir.glob("procompta_backup_*.zip"))
+    if existing:
+        last_mtime = datetime.fromtimestamp(existing[-1].stat().st_mtime)
+        if (datetime.now() - last_mtime).days < 7:
+            return
+    try:
+        await asyncio.to_thread(save_backup_to_disk)
+        logger.info("Backup automatique créé avec succès")
+    except Exception:
+        logger.exception("Échec du backup automatique au démarrage")
 
 
 @app.on_event("startup")

@@ -36,13 +36,8 @@ def _psql_env(db: dict) -> dict:
     return {"PGPASSWORD": db["password"], "PATH": "/usr/bin:/bin:/usr/lib/postgresql/16/bin"}
 
 
-@router.get("/download")
-async def download_backup(
-    request: Request,
-    user: User = Depends(get_current_user),
-) -> StreamingResponse:
+def _build_backup_bytes() -> bytes:
     db = _parse_db_url()
-
     result = subprocess.run(
         ["pg_dump", "--clean", "--if-exists", "--exclude-table=users",
          "-h", db["host"], "-p", db["port"], "-U", db["user"], db["dbname"]],
@@ -51,7 +46,7 @@ async def download_backup(
         timeout=120,
     )
     if result.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"pg_dump failed: {result.stderr.decode()}")
+        raise RuntimeError(f"pg_dump failed: {result.stderr.decode()}")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -61,11 +56,35 @@ async def download_backup(
             if file.is_file():
                 zf.write(file, arcname=f"storage/{file.relative_to(storage)}")
     buf.seek(0)
+    return buf.read()
+
+
+def save_backup_to_disk() -> None:
+    backup_dir = Path(settings.backup_path)
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    data = _build_backup_bytes()
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    (backup_dir / f"procompta_backup_{timestamp}.zip").write_bytes(data)
+    # Garder seulement les 5 dernières sauvegardes
+    existing = sorted(backup_dir.glob("procompta_backup_*.zip"))
+    for old in existing[:-5]:
+        old.unlink()
+
+
+@router.get("/download")
+async def download_backup(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    try:
+        data = _build_backup_bytes()
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"procompta_backup_{timestamp}.zip"
     return StreamingResponse(
-        buf,
+        io.BytesIO(data),
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
