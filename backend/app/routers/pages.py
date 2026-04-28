@@ -95,6 +95,8 @@ _eur_amount = case(
     else_=Document.amount_ttc_eur,
 )
 
+_filing_date = func.coalesce(Document.payment_date, Document.document_date)
+
 _CAT_LABELS = {"depense": "Dépenses", "recette": "Recettes", "autre": "Autres"}
 _CAT_ORDER  = {"depense": 0, "recette": 1, "autre": 2}
 
@@ -177,8 +179,8 @@ def _variation(current: Decimal, prev: Decimal, *, higher_is_better: bool = True
 async def dashboard(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
     today = date.today()
     _na   = Document.archived == False
-    _year_filter      = (extract("year", Document.document_date) == today.year,     _na)
-    _prev_year_filter = (extract("year", Document.document_date) == today.year - 1, _na)
+    _year_filter      = (extract("year", _filing_date) == today.year,     _na)
+    _prev_year_filter = (extract("year", _filing_date) == today.year - 1, _na)
 
     no_type_count, no_correspondent_count = [
         (await session.scalar(q)) or 0
@@ -216,13 +218,13 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
     # Données mensuelles pour le graphique
     monthly_result = await session.execute(
         select(
-            extract("month", Document.document_date).label("month"),
+            extract("month", _filing_date).label("month"),
             func.coalesce(func.sum(_eur_amount).filter(Document.category == CategoryEnum.depense), 0).label("depenses"),
             func.coalesce(func.sum(_eur_amount).filter(Document.category == CategoryEnum.recette), 0).label("recettes"),
         )
         .where(*_year_filter)
-        .group_by(extract("month", Document.document_date))
-        .order_by(extract("month", Document.document_date))
+        .group_by(extract("month", _filing_date))
+        .order_by(extract("month", _filing_date))
     )
     monthly_map = {int(r.month): r for r in monthly_result.all()}
     monthly_depenses = [float(monthly_map[m].depenses if m in monthly_map else 0) for m in range(1, 13)]
@@ -298,7 +300,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
 async def years_list(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
     result = await session.execute(
         select(
-            extract("year", Document.document_date).label("year"),
+            extract("year", _filing_date).label("year"),
             func.count(Document.id).label("count"),
             func.coalesce(
                 func.sum(_eur_amount).filter(Document.category == CategoryEnum.recette),
@@ -310,8 +312,8 @@ async def years_list(request: Request, session: AsyncSession = Depends(get_sessi
             ).label("total_depenses"),
         )
         .where(Document.archived == False)
-        .group_by(extract("year", Document.document_date))
-        .order_by(extract("year", Document.document_date).desc())
+        .group_by(extract("year", _filing_date))
+        .order_by(extract("year", _filing_date).desc())
     )
     return render(request, "pages/years.html", {"years_data": result.all()})
 
@@ -352,7 +354,7 @@ async def year_view(
         select(Document)
         .options(selectinload(Document.tags), selectinload(Document.correspondent), selectinload(Document.document_type))
         .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
-        .where(extract("year", Document.document_date) == year, Document.archived == False)
+        .where(extract("year", _filing_date) == year, Document.archived == False)
     )
     if corr_uuid:
         stmt = stmt.where(Document.correspondent_id == corr_uuid)
@@ -387,7 +389,7 @@ async def year_view(
         select(Document)
         .options(selectinload(Document.tags), selectinload(Document.correspondent), selectinload(Document.document_type))
         .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
-        .where(extract("year", Document.document_date) == year, Document.archived == True)
+        .where(extract("year", _filing_date) == year, Document.archived == True)
     )
     if corr_uuid:
         archived_stmt = archived_stmt.where(Document.correspondent_id == corr_uuid)
@@ -605,6 +607,7 @@ async def document_update_form(
     old_category = doc.category.value
     old_amount = f"{doc.amount_ttc} {doc.currency}" if doc.amount_ttc else None
     old_date = doc.document_date.isoformat() if doc.document_date else None
+    old_payment_date = doc.payment_date
     old_notes = doc.notes
 
     if title := str(form.get("title", "")).strip():
@@ -663,16 +666,17 @@ async def document_update_form(
             session.add(a)
         await session.commit()
 
-    # Rename file if title or date changed
-    if doc.title != old_title or new_date != old_date:
-        new_path = rename_file(old_file_path, doc.id, doc.document_date, doc.title, doc.mime_type)
+    # Rename file if title, document date, or payment date changed
+    if doc.title != old_title or new_date != old_date or doc.payment_date != old_payment_date:
+        new_path = rename_file(old_file_path, doc.id, doc.document_date, doc.title, doc.mime_type, payment_date=doc.payment_date)
         if new_path != old_file_path:
             doc.file_path = new_path
             await session.commit()
 
     await _sync_notification_pages(doc, session)
     back = str(form.get("back", "")).strip()
-    redirect_url = back if back and back.startswith("/") else f"/year/{doc.document_date.year}"
+    filing_year = (doc.payment_date or doc.document_date).year
+    redirect_url = back if back and back.startswith("/") else f"/year/{filing_year}"
     return RedirectResponse(redirect_url, status_code=303)
 
 
@@ -681,13 +685,13 @@ async def document_delete_form(id: uuid.UUID, session: AsyncSession = Depends(ge
     doc = await session.get(Document, id)
     if not doc:
         raise HTTPException(status_code=404)
-    year, file_path, doc_id = doc.document_date.year, doc.file_path, doc.id
+    year, file_path, doc_id = (doc.payment_date or doc.document_date).year, doc.file_path, doc.id
     await session.delete(doc)
     await session.commit()
     delete_file(file_path)
     delete_preview(doc_id)
     remaining = await session.scalar(
-        select(func.count(Document.id)).where(extract("year", Document.document_date) == year)
+        select(func.count(Document.id)).where(extract("year", _filing_date) == year)
     )
     return RedirectResponse(f"/year/{year}" if remaining else "/years", status_code=303)
 
@@ -704,18 +708,18 @@ async def reports(
     today = date.today()
 
     years_result = await session.execute(
-        select(extract("year", Document.document_date).label("year"))
+        select(extract("year", _filing_date).label("year"))
         .where(Document.archived == False)
         .distinct()
-        .order_by(extract("year", Document.document_date).desc())
+        .order_by(extract("year", _filing_date).desc())
     )
     available_years = [int(r.year) for r in years_result.all()]
     if year is None:
         year = today.year if today.year in available_years else (available_years[0] if available_years else today.year)
 
-    _base = [extract("year", Document.document_date) == year, Document.archived == False]
+    _base = [extract("year", _filing_date) == year, Document.archived == False]
     if quarter:
-        _base.append(extract("quarter", Document.document_date) == quarter)
+        _base.append(extract("quarter", _filing_date) == quarter)
 
     _Q_SUFFIX = {1: " · T1", 2: " · T2", 3: " · T3", 4: " · T4"}
     period_label = str(year) + (_Q_SUFFIX.get(quarter, "") if quarter else "")
@@ -784,18 +788,18 @@ async def reports(
     ]
 
     # TVA par trimestre - toujours sur l'année complète (T1→T4)
-    _base_year = [extract("year", Document.document_date) == year, Document.archived == False]
+    _base_year = [extract("year", _filing_date) == year, Document.archived == False]
     tva_q_result = await session.execute(
         select(
-            extract("quarter", Document.document_date).label("q"),
+            extract("quarter", _filing_date).label("q"),
             func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.depense), 0).label("base_ht_dep"),
             func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.depense), 0).label("tva_ded"),
             func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.recette), 0).label("base_ht_rec"),
             func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.recette), 0).label("tva_col"),
         )
         .where(*_base_year)
-        .group_by(extract("quarter", Document.document_date))
-        .order_by(extract("quarter", Document.document_date))
+        .group_by(extract("quarter", _filing_date))
+        .order_by(extract("quarter", _filing_date))
     )
     _tva_by_q: dict[int, dict] = {}
     for r in tva_q_result.all():
@@ -838,9 +842,9 @@ async def export_documents_csv(
     quarter: int | None = Query(default=None, ge=1, le=4),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    _base = [extract("year", Document.document_date) == year, Document.archived == False]
+    _base = [extract("year", _filing_date) == year, Document.archived == False]
     if quarter:
-        _base.append(extract("quarter", Document.document_date) == quarter)
+        _base.append(extract("quarter", _filing_date) == quarter)
 
     result = await session.execute(
         select(Document)
@@ -888,9 +892,9 @@ async def export_bilan_csv(
     quarter: int | None = Query(default=None, ge=1, le=4),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    _base = [extract("year", Document.document_date) == year, Document.archived == False]
+    _base = [extract("year", _filing_date) == year, Document.archived == False]
     if quarter:
-        _base.append(extract("quarter", Document.document_date) == quarter)
+        _base.append(extract("quarter", _filing_date) == quarter)
 
     result = await session.execute(
         select(
@@ -937,18 +941,18 @@ async def export_tva_csv(
     year: int = Query(...),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
-    _base_year = [extract("year", Document.document_date) == year, Document.archived == False]
+    _base_year = [extract("year", _filing_date) == year, Document.archived == False]
     tva_q_result = await session.execute(
         select(
-            extract("quarter", Document.document_date).label("q"),
+            extract("quarter", _filing_date).label("q"),
             func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.depense), 0).label("base_ht_dep"),
             func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.depense), 0).label("tva_ded"),
             func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.recette), 0).label("base_ht_rec"),
             func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.recette), 0).label("tva_col"),
         )
         .where(*_base_year)
-        .group_by(extract("quarter", Document.document_date))
-        .order_by(extract("quarter", Document.document_date))
+        .group_by(extract("quarter", _filing_date))
+        .order_by(extract("quarter", _filing_date))
     )
     _tva_by_q: dict[int, dict] = {}
     for r in tva_q_result.all():

@@ -32,12 +32,12 @@ async def migrate() -> None:
         migrated = 0
         skipped = 0
         for doc in docs:
-            expected = build_file_path(doc.id, doc.document_date, doc.title, doc.mime_type)
+            expected = build_file_path(doc.id, doc.document_date, doc.title, doc.mime_type, payment_date=doc.payment_date)
             if doc.file_path == expected:
                 skipped += 1
                 continue
 
-            new_path = rename_file(doc.file_path, doc.id, doc.document_date, doc.title, doc.mime_type)
+            new_path = rename_file(doc.file_path, doc.id, doc.document_date, doc.title, doc.mime_type, payment_date=doc.payment_date)
             print(f"  {doc.file_path!r:60s} → {new_path!r}")
             doc.file_path = new_path
             migrated += 1

@@ -18,11 +18,12 @@ _MIME_EXT = {
 }
 
 
-def build_file_path(document_id: uuid.UUID, document_date: date, title: str, mime: str) -> str:
+def build_file_path(document_id: uuid.UUID, document_date: date, title: str, mime: str, payment_date: date | None = None) -> str:
+    folder_date = payment_date or document_date
     ext = _MIME_EXT.get(mime, ".bin")
     slug = (slugify(title)[:40].strip("-") or "document")
     short_id = str(document_id)[:8]
-    return f"{document_date.year}/{document_date.isoformat()}_{slug}_{short_id}{ext}"
+    return f"{folder_date.year}/{folder_date.isoformat()}_{slug}_{short_id}{ext}"
 
 
 async def save_file_bytes(
@@ -31,8 +32,9 @@ async def save_file_bytes(
     document_date: date,
     title: str,
     mime: str,
+    payment_date: date | None = None,
 ) -> str:
-    relative_path = build_file_path(document_id, document_date, title, mime)
+    relative_path = build_file_path(document_id, document_date, title, mime, payment_date)
     full_path = Path(settings.storage_path) / relative_path
     full_path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(full_path, "wb") as f:
@@ -40,9 +42,9 @@ async def save_file_bytes(
     return relative_path
 
 
-def rename_file(old_path: str, document_id: uuid.UUID, new_date: date, new_title: str, mime: str) -> str:
+def rename_file(old_path: str, document_id: uuid.UUID, new_date: date, new_title: str, mime: str, payment_date: date | None = None) -> str:
     """Move/rename file when title or date changes. Returns the new relative path."""
-    new_path = build_file_path(document_id, new_date, new_title, mime)
+    new_path = build_file_path(document_id, new_date, new_title, mime, payment_date)
     if old_path == new_path:
         return old_path
     old_full = Path(settings.storage_path) / old_path
