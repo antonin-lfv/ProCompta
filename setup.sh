@@ -10,6 +10,11 @@ success() { echo -e "${GREEN}✓${NC}  $*"; }
 warn()    { echo -e "${YELLOW}⚠${NC}  $*"; }
 die()     { echo -e "${RED}✗${NC}  $*" >&2; exit 1; }
 
+trap '
+  code=$?
+  [ $code -ne 0 ] && echo -e "\n${YELLOW}⚠${NC}  Une erreur est survenue. Pas besoin de relancer ${BOLD}git clone${NC} — corrigez le problème puis relancez simplement : ${BOLD}./setup.sh${NC}"
+' EXIT
+
 echo ""
 echo -e "${BOLD}ProCompta - Installation${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -38,7 +43,7 @@ else
   echo -e "${BOLD}Création du compte administrateur${NC}"
   echo ""
 
-  read -r  -p "  Prénom          : " ADMIN_NAME
+  read -r  -p "  Dénomination    : " ADMIN_NAME
   read -r  -p "  E-mail          : " ADMIN_EMAIL
 
   while true; do

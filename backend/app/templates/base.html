@@ -303,6 +303,594 @@
     </div>
   </div>
 
+  <!-- Global drag-drop upload (toutes pages sauf /year/ qui gère le sien) -->
+  <div
+    x-data="globalUploadData()"
+    @dragover.window.prevent="if(!_isYearPage() && !uploading && !batchModal) dragOver = true"
+    @dragleave.window="if(!_isYearPage() && !$event.relatedTarget) dragOver = false"
+    @drop.window.prevent="if(!_isYearPage()) { dragOver = false; handleDrop($event); }"
+    @trigger-upload.window="if(!_isYearPage()) $refs.globalFileInput.click()"
+  >
+    <!-- Input fichier caché -->
+    <input x-ref="globalFileInput" type="file" accept="application/pdf,image/jpeg,image/png" multiple class="hidden" @change="handleFile($event)">
+
+    <!-- Drag overlay -->
+    <div
+      class="fixed inset-0 z-50 bg-indigo-900/20 backdrop-blur-sm flex items-center justify-center pointer-events-none"
+      x-show="dragOver"
+      x-cloak
+    >
+      <div class="bg-white rounded-2xl border-2 border-dashed border-indigo-400 px-16 py-12 text-center shadow-xl">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+             class="w-12 h-12 mx-auto text-indigo-400 mb-3">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+        </svg>
+        <p class="text-lg font-semibold text-indigo-700">Déposez vos fichiers ici</p>
+        <p class="text-sm text-slate-500 mt-1">PDF, JPEG ou PNG · un ou plusieurs fichiers · max 50 Mo par fichier</p>
+      </div>
+    </div>
+
+    <!-- Toast spinner / erreur (upload simple) -->
+    <div x-show="uploading || uploadError" x-cloak
+         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
+      <template x-if="uploading">
+        <div class="flex items-center gap-3 bg-indigo-600 text-white rounded-xl px-4 py-3 shadow-lg">
+          <svg class="w-5 h-5 animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span class="text-sm font-medium">Import en cours, redirection vers l'édition…</span>
+        </div>
+      </template>
+      <template x-if="!uploading && uploadError">
+        <div class="flex items-center justify-between bg-red-600 text-white rounded-xl px-4 py-3 shadow-lg">
+          <div class="flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 shrink-0">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <span class="text-sm font-medium" x-text="uploadError"></span>
+            <template x-if="dupId">
+              <a :href="'/documents/' + dupId + '/edit'" class="text-sm underline font-semibold hover:opacity-80">Voir →</a>
+            </template>
+          </div>
+          <button @click="uploadError = ''; dupId = ''" class="ml-4 opacity-70 hover:opacity-100 transition-opacity shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </template>
+    </div>
+
+    <!-- Batch Upload Modal -->
+    <div
+      x-show="batchModal"
+      x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      @keydown.escape.window="if(!_isYearPage() && batchState==='editing') closeBatchModal()"
+      @keydown.arrow-left.window="if(!_isYearPage() && batchState==='editing') batchPrev()"
+      @keydown.arrow-right.window="if(!_isYearPage() && batchState==='editing') batchNext()"
+    >
+      <div class="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden" style="height:85vh;min-height:500px;width:100%;max-width:56rem">
+
+        <!-- Header -->
+        <div class="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h2 class="text-base font-semibold text-slate-800">Importer des documents</h2>
+            <p class="text-xs text-slate-400 mt-0.5" x-show="batchState === 'editing' && batchFiles.length > 1"
+               x-text="`Fichier ${batchIdx + 1} sur ${batchFiles.length}`"></p>
+            <p class="text-xs text-slate-400 mt-0.5" x-show="batchState === 'editing' && batchFiles.length === 1">1 fichier</p>
+            <p class="text-xs text-slate-400 mt-0.5" x-show="batchState === 'uploading'">Import en cours…</p>
+            <p class="text-xs text-slate-400 mt-0.5" x-show="batchState === 'done'">Import terminé</p>
+          </div>
+          <button x-show="batchState === 'editing'" @click="closeBatchModal()"
+                  class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Barre progression carousel -->
+        <div x-show="batchState === 'editing' && batchFiles.length > 1" class="w-full bg-slate-100 h-0.5 shrink-0">
+          <div class="bg-indigo-500 h-0.5 transition-all duration-300"
+               :style="`width: ${batchFiles.length ? ((batchIdx + 1) / batchFiles.length * 100) : 0}%`"></div>
+        </div>
+
+        <!-- État : editing -->
+        <template x-if="batchState === 'editing' && batchFiles.length > 0">
+        <div class="flex flex-1 min-h-0 overflow-hidden">
+          <!-- Panneau preview -->
+          <div class="shrink-0 border-r border-slate-100 flex flex-col items-center justify-center bg-slate-50 overflow-hidden" style="width:28rem">
+            <div x-show="batchFiles[batchIdx]?.previewKind === 'image'" class="w-full h-full flex items-center justify-center p-3">
+              <img :src="batchFiles[batchIdx]?.previewUrl || ''" class="max-h-full max-w-full rounded-lg object-contain shadow" alt="">
+            </div>
+            <div x-show="batchFiles[batchIdx]?.previewKind === 'pdf'" class="w-full h-full">
+              <embed :src="batchFiles[batchIdx]?.previewUrl || ''" type="application/pdf" class="w-full h-full" style="min-height:220px">
+            </div>
+            <div x-show="!batchFiles[batchIdx]?.previewKind" class="flex flex-col items-center gap-2 text-center p-4">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-14 h-14 text-slate-300">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+              </svg>
+              <span class="text-xs text-slate-400 break-all leading-tight" x-text="batchFiles[batchIdx]?.name"></span>
+            </div>
+          </div>
+
+          <!-- Panneau formulaire -->
+          <div class="flex-1 overflow-y-auto p-5 space-y-4">
+            <!-- Titre -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Titre</label>
+              <input type="text" x-model="batchFiles[batchIdx].title"
+                     class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+            </div>
+            <!-- Date -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Date du document</label>
+              <input type="date" x-model="batchFiles[batchIdx].date"
+                     class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+            </div>
+            <!-- Catégorie -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Catégorie</label>
+              <div class="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
+                <button type="button" @click="batchFiles[batchIdx].category = 'depense'"
+                        :class="batchFiles[batchIdx].category === 'depense' ? 'bg-red-50 text-red-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
+                        class="flex-1 py-2 transition-colors border-r border-slate-200">Dépense</button>
+                <button type="button" @click="batchFiles[batchIdx].category = 'recette'"
+                        :class="batchFiles[batchIdx].category === 'recette' ? 'bg-green-50 text-green-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
+                        class="flex-1 py-2 transition-colors border-r border-slate-200">Recette</button>
+                <button type="button" @click="batchFiles[batchIdx].category = 'autre'"
+                        :class="batchFiles[batchIdx].category === 'autre' ? 'bg-slate-100 text-slate-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
+                        class="flex-1 py-2 transition-colors">Autre</button>
+              </div>
+            </div>
+            <!-- Correspondant -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Correspondant</label>
+              <select x-model="batchFiles[batchIdx].correspondent_id"
+                      class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value=""></option>
+                <template x-for="c in correspondents" :key="c.id">
+                  <option :value="c.id" x-text="c.name"></option>
+                </template>
+              </select>
+            </div>
+            <!-- Type de document -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Type de document</label>
+              <select x-model="batchFiles[batchIdx].document_type_id"
+                      class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value=""></option>
+                <template x-for="dt in docTypes" :key="dt.id">
+                  <option :value="dt.id" x-text="dt.name"></option>
+                </template>
+              </select>
+            </div>
+            <!-- Tags -->
+            <div x-show="tags.length > 0">
+              <label class="block text-xs font-medium text-slate-600 mb-1.5">Tags</label>
+              <div class="relative">
+                <button type="button" @click="openTagPicker = !openTagPicker"
+                        :class="batchFiles[batchIdx]?.tag_ids.length > 0 ? 'border-indigo-300 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+                        class="w-full h-9 px-3 text-sm rounded-lg border transition-colors flex items-center gap-2 text-left">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 shrink-0">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z" />
+                  </svg>
+                  <span x-text="batchFiles[batchIdx]?.tag_ids.length > 0 ? `${batchFiles[batchIdx].tag_ids.length} tag${batchFiles[batchIdx].tag_ids.length > 1 ? 's' : ''} sélectionné${batchFiles[batchIdx].tag_ids.length > 1 ? 's' : ''}` : 'Sélectionner des tags…'"></span>
+                </button>
+                <div x-show="openTagPicker" @click.outside="openTagPicker = false"
+                     class="absolute left-0 top-full mt-1 w-full bg-white rounded-lg border border-slate-200 shadow-lg z-20 py-1 max-h-40 overflow-y-auto">
+                  <template x-for="tag in tags" :key="tag.id">
+                    <label class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                      <input type="checkbox" :checked="batchFiles[batchIdx]?.tag_ids.includes(tag.id)"
+                             @change="toggleTag(tag.id)" class="rounded border-slate-300 text-indigo-500 focus:ring-indigo-400 w-3.5 h-3.5">
+                      <span class="text-sm text-slate-700" x-text="tag.name"></span>
+                    </label>
+                  </template>
+                </div>
+              </div>
+            </div>
+            <!-- Montants -->
+            <div x-show="batchFiles[batchIdx]?.category !== 'autre'" class="space-y-3 pt-1 border-t border-slate-100">
+              <label class="block text-xs font-medium text-slate-600">Montants</label>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Devise</label>
+                  <select x-model="batchFiles[batchIdx].currency"
+                          @change="batchFiles[batchIdx].amount_ttc_eur = ''"
+                          class="w-full h-9 text-sm rounded-lg border border-slate-200 px-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                    <option value="GBP">GBP</option>
+                    <option value="CHF">CHF</option>
+                    <option value="JPY">JPY</option>
+                    <option value="CAD">CAD</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">HT</label>
+                  <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].amount_ht" placeholder="0.00"
+                         class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">TVA</label>
+                  <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].vat_amount" placeholder="0.00"
+                         class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">TTC</label>
+                  <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].amount_ttc" placeholder="0.00"
+                         class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+                <div x-show="batchFiles[batchIdx]?.currency !== 'EUR'">
+                  <label class="block text-xs text-slate-400 mb-1">Équivalent EUR</label>
+                  <div class="flex gap-1">
+                    <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].amount_ttc_eur" placeholder="0.00"
+                           class="flex-1 h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <button type="button" @click="fetchConversion()" :disabled="fetchingRate"
+                            title="Recalculer via BCE"
+                            class="px-2.5 h-9 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 disabled:opacity-50 transition-colors shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                           class="w-4 h-4" :class="fetchingRate ? 'animate-spin' : ''">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1">Taux BCE à la date de paiement (ou du jour)</p>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Date de paiement</label>
+                <input type="date" x-model="batchFiles[batchIdx].payment_date"
+                       class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              </div>
+            </div>
+          </div>
+        </div>
+        </template>
+
+        <!-- État : uploading -->
+        <div x-show="batchState === 'uploading'" class="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-slate-700">Import en cours…</span>
+              <span class="text-xs tabular-nums text-slate-400" x-text="`${batchProgress} / ${batchTotal}`"></span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2">
+              <div class="bg-indigo-500 h-2 rounded-full transition-all duration-300"
+                   :style="`width: ${batchTotal ? (batchProgress / batchTotal * 100) : 0}%`"></div>
+            </div>
+          </div>
+          <div class="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden">
+            <template x-for="(r, i) in batchResults" :key="i">
+              <div class="flex items-center gap-3 px-4 py-2.5">
+                <span x-show="r.status === 'ok'" class="text-green-500 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                </span>
+                <span x-show="r.status === 'dup'" class="text-amber-500 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                </span>
+                <span x-show="r.status === 'err'" class="text-red-500 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                </span>
+                <span class="text-sm text-slate-600 truncate flex-1" x-text="r.name"></span>
+                <span x-show="r.status === 'dup'" class="text-xs text-amber-500 shrink-0">doublon</span>
+                <span x-show="r.status === 'err'" class="text-xs text-red-500 shrink-0">erreur</span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- État : done -->
+        <div x-show="batchState === 'done'" class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+              <span x-text="`${batchResults.filter(r=>r.status==='ok').length} importé${batchResults.filter(r=>r.status==='ok').length > 1 ? 's' : ''}`"></span>
+            </span>
+            <span x-show="batchResults.filter(r=>r.status==='dup').length > 0"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+              <span x-text="`${batchResults.filter(r=>r.status==='dup').length} doublon${batchResults.filter(r=>r.status==='dup').length > 1 ? 's' : ''}`"></span>
+            </span>
+            <span x-show="batchResults.filter(r=>r.status==='err').length > 0"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+              <span x-text="`${batchResults.filter(r=>r.status==='err').length} erreur${batchResults.filter(r=>r.status==='err').length > 1 ? 's' : ''}`"></span>
+            </span>
+          </div>
+          <div class="divide-y divide-slate-100 rounded-xl border border-slate-200 overflow-hidden">
+            <template x-for="(r, i) in batchResults" :key="i">
+              <div class="flex items-center gap-3 px-4 py-2.5">
+                <span x-show="r.status === 'ok'" class="text-green-500 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                </span>
+                <span x-show="r.status === 'dup'" class="text-amber-500 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15 12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
+                </span>
+                <span x-show="r.status === 'err'" class="text-red-500 shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                </span>
+                <span class="text-sm text-slate-600 truncate flex-1" x-text="r.name"></span>
+                <span x-show="r.status === 'ok'" class="text-xs text-green-600 shrink-0">importé</span>
+                <span x-show="r.status === 'dup'" class="text-xs text-amber-500 shrink-0">déjà présent</span>
+                <span x-show="r.status === 'err'" class="text-xs text-red-500 shrink-0">erreur</span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Footer : editing -->
+        <div x-show="batchState === 'editing'"
+             class="flex items-center justify-between px-6 py-4 border-t border-slate-100 shrink-0 gap-3">
+          <button @click="batchDeleteCurrent()"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 border border-transparent hover:border-red-200 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+            Retirer
+          </button>
+          <div class="flex items-center gap-2">
+            <button @click="batchPrev()" :disabled="batchIdx === 0"
+                    :class="batchIdx === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100'"
+                    class="p-2 rounded-lg text-slate-600 transition-colors" title="Précédent (←)">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+            <button @click="batchNext()" :disabled="batchIdx === batchFiles.length - 1"
+                    :class="batchIdx === batchFiles.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-slate-100'"
+                    class="p-2 rounded-lg text-slate-600 transition-colors" title="Suivant (→)">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+            <button @click="startBatchUpload()"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+              </svg>
+              <span x-text="`Importer ${batchFiles.length} fichier${batchFiles.length > 1 ? 's' : ''}`"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Footer : done -->
+        <div x-show="batchState === 'done'"
+             class="flex items-center justify-end px-6 py-4 border-t border-slate-100 shrink-0">
+          <button @click="closeBatchModal()"
+                  class="px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Fermer
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function globalUploadData() {
+      let _rawFiles = [];
+      return {
+        dragOver: false,
+        uploading: false,
+        uploadError: '',
+        dupId: '',
+        batchModal: false,
+        batchFiles: [],
+        batchIdx: 0,
+        batchState: 'editing',
+        batchProgress: 0,
+        batchTotal: 0,
+        batchResults: [],
+        openTagPicker: false,
+        fetchingRate: false,
+        correspondents: [],
+        docTypes: [],
+        tags: [],
+        todayISO: new Date().toISOString().split('T')[0],
+
+        _isYearPage() { return window.location.pathname.startsWith('/year/'); },
+
+        async _loadRefData() {
+          if (this.correspondents.length || this.docTypes.length) return;
+          const [c, dt, t] = await Promise.all([
+            fetch('/api/correspondents').then(r => r.json()),
+            fetch('/api/document-types').then(r => r.json()),
+            fetch('/api/tags').then(r => r.json()),
+          ]);
+          this.correspondents = c;
+          this.docTypes = dt;
+          this.tags = t;
+        },
+
+        async _routeFiles(files) {
+          if (!files.length) return;
+          if (files.length === 1) { await this.upload(files[0]); }
+          else { await this.openBatchModal(files); }
+        },
+        async handleDrop(e) {
+          if (this.uploading || this.batchModal) return;
+          await this._routeFiles(Array.from(e.dataTransfer?.files || []));
+        },
+        async handleFile(e) {
+          const files = Array.from(e.target.files);
+          e.target.value = '';
+          await this._routeFiles(files);
+        },
+        async upload(file) {
+          if (this.uploading) return;
+          this.uploading = true;
+          this.uploadError = '';
+          this.dupId = '';
+          const fd = new FormData();
+          fd.append('file', file);
+          try {
+            const resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+            if (resp.status === 201) {
+              const doc = await resp.json();
+              window.location.href = '/documents/' + doc.id + '/edit';
+            } else if (resp.status === 409) {
+              this.dupId = resp.headers.get('X-Duplicate-Id') || '';
+              this.uploadError = 'Ce fichier existe déjà dans la base.';
+              this.uploading = false;
+            } else if (resp.status === 413) {
+              this.uploadError = 'Fichier trop volumineux (max 50 Mo).';
+              this.uploading = false;
+            } else if (resp.status === 400) {
+              const d = await resp.json().catch(() => ({}));
+              this.uploadError = d.detail || 'Format de fichier non accepté.';
+              this.uploading = false;
+            } else {
+              this.uploadError = 'Erreur lors de l\'import (' + resp.status + ').';
+              this.uploading = false;
+            }
+          } catch(err) {
+            this.uploadError = 'Impossible de joindre le serveur.';
+            this.uploading = false;
+          }
+        },
+        readPreview(file) {
+          if (file.type === 'application/pdf') return Promise.resolve({ url: URL.createObjectURL(file), kind: 'pdf' });
+          if (file.type.startsWith('image/')) {
+            return new Promise(resolve => {
+              const reader = new FileReader();
+              reader.onload = e => resolve({ url: e.target.result, kind: 'image' });
+              reader.readAsDataURL(file);
+            });
+          }
+          return Promise.resolve(null);
+        },
+        async openBatchModal(files) {
+          await this._loadRefData();
+          _rawFiles = Array.from(files);
+          const items = [];
+          for (const file of _rawFiles) {
+            const preview = await this.readPreview(file);
+            items.push({
+              name: file.name,
+              previewUrl: preview?.url ?? null,
+              previewKind: preview?.kind ?? null,
+              title: file.name.replace(/\.[^/.]+$/, ''),
+              date: this.todayISO,
+              category: 'autre',
+              correspondent_id: '',
+              document_type_id: '',
+              tag_ids: [],
+              currency: 'EUR',
+              amount_ht: '',
+              vat_amount: '',
+              amount_ttc: '',
+              amount_ttc_eur: '',
+              payment_date: '',
+            });
+          }
+          this.batchFiles = items;
+          this.batchIdx = 0;
+          this.batchState = 'editing';
+          this.batchResults = [];
+          this.openTagPicker = false;
+          this.batchModal = true;
+        },
+        batchNext() { if (this.batchIdx < this.batchFiles.length - 1) { this.batchIdx++; this.openTagPicker = false; } },
+        batchPrev() { if (this.batchIdx > 0) { this.batchIdx--; this.openTagPicker = false; } },
+        batchDeleteCurrent() {
+          const item = this.batchFiles[this.batchIdx];
+          if (item?.previewKind === 'pdf' && item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+          this.batchFiles.splice(this.batchIdx, 1);
+          _rawFiles.splice(this.batchIdx, 1);
+          this.openTagPicker = false;
+          if (this.batchFiles.length === 0) { this.closeBatchModal(); return; }
+          if (this.batchIdx >= this.batchFiles.length) this.batchIdx = this.batchFiles.length - 1;
+        },
+        closeBatchModal() {
+          const shouldReload = this.batchState === 'done';
+          this.batchFiles.forEach(item => { if (item.previewKind === 'pdf' && item.previewUrl) URL.revokeObjectURL(item.previewUrl); });
+          this.batchModal = false;
+          this.batchFiles = [];
+          _rawFiles = [];
+          this.batchIdx = 0;
+          this.batchState = 'editing';
+          this.batchResults = [];
+          this.openTagPicker = false;
+          if (shouldReload) window.location.reload();
+        },
+        async startBatchUpload() {
+          this.openTagPicker = false;
+          this.batchTotal = this.batchFiles.length;
+          this.batchState = 'uploading';
+          this.batchResults = [];
+          this.batchProgress = 0;
+          for (let i = 0; i < this.batchFiles.length; i++) {
+            this.batchProgress = i + 1;
+            const item = this.batchFiles[i];
+            const fd = new FormData();
+            fd.append('file', _rawFiles[i]);
+            try {
+              const resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+              if (resp.status === 201) {
+                const doc = await resp.json();
+                await fetch(`/api/documents/${doc.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    title: item.title || item.name,
+                    document_date: item.date || this.todayISO,
+                    category: item.category || 'autre',
+                    correspondent_id: item.correspondent_id || doc.correspondent_id || null,
+                    document_type_id: item.document_type_id || doc.document_type_id || null,
+                    tag_ids: item.tag_ids || [],
+                    currency: item.currency || 'EUR',
+                    amount_ht: item.category !== 'autre' && item.amount_ht !== '' ? parseFloat(item.amount_ht) : null,
+                    vat_amount: item.category !== 'autre' && item.vat_amount !== '' ? parseFloat(item.vat_amount) : null,
+                    amount_ttc: item.category !== 'autre' && item.amount_ttc !== '' ? parseFloat(item.amount_ttc) : null,
+                    amount_ttc_eur: item.category !== 'autre' && item.amount_ttc_eur !== '' ? parseFloat(item.amount_ttc_eur) : null,
+                    payment_date: item.category !== 'autre' ? item.payment_date || null : null,
+                  }),
+                });
+                this.batchResults = [...this.batchResults, { name: item.title || item.name, status: 'ok' }];
+              } else if (resp.status === 409) {
+                this.batchResults = [...this.batchResults, { name: item.title || item.name, status: 'dup' }];
+              } else {
+                this.batchResults = [...this.batchResults, { name: item.title || item.name, status: 'err' }];
+              }
+            } catch(e) {
+              this.batchResults = [...this.batchResults, { name: item.title || item.name, status: 'err' }];
+            }
+          }
+          this.batchState = 'done';
+          window.dispatchEvent(new CustomEvent('notif-changed', { detail: null }));
+        },
+        async fetchConversion() {
+          const item = this.batchFiles[this.batchIdx];
+          if (!item || item.currency === 'EUR') return;
+          const amount = parseFloat(item.amount_ttc);
+          if (!amount) return;
+          this.fetchingRate = true;
+          try {
+            const resp = await fetch('/api/documents/convert-currency', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ currency: item.currency, amount, date: item.payment_date || item.date || null }),
+            });
+            if (resp.ok) { const data = await resp.json(); item.amount_ttc_eur = data.amount_eur; }
+          } finally {
+            this.fetchingRate = false;
+          }
+        },
+        toggleTag(tagId) {
+          const item = this.batchFiles[this.batchIdx];
+          if (!item) return;
+          item.tag_ids = item.tag_ids.includes(tagId) ? item.tag_ids.filter(id => id !== tagId) : [...item.tag_ids, tagId];
+        },
+      };
+    }
+  </script>
+
   <script>
     document.addEventListener('keydown', function(e) {
       const tag = e.target.tagName;

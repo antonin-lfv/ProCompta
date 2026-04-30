@@ -49,6 +49,9 @@ Il s'adresse aux **indépendants, micro-entrepreneurs et petites structures** qu
 
 **Prérequis : Docker Desktop installé et démarré.**
 
+> [!NOTE]
+> Si Docker Desktop n'est pas encore installé, téléchargez-le sur [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/).
+
 ```bash
 git clone https://github.com/antonin-lfv/ProCompta.git
 cd ProCompta
@@ -59,7 +62,7 @@ chmod +x setup.sh
 Le script fait tout automatiquement :
 
 1. Vérifie que Docker est disponible
-2. Demande votre prénom, e-mail et mot de passe
+2. Demande votre dénomination, e-mail et mot de passe
 3. Génère une `SECRET_KEY` et un mot de passe PostgreSQL aléatoires
 4. Crée les dossiers `storage/` (documents) et `backups/`
 5. Propose de configurer le domaine local `http://procompta.local` (optionnel - nécessite sudo)
