@@ -80,6 +80,7 @@ function yearData() {
     batchResults: [],
     openTagPicker: false,
     fetchingRate: false,
+    batchApplied: { category: false, correspondent_id: false, document_type_id: false, tag_ids: false },
     imgScale: 1, imgTx: 0, imgTy: 0, _imgDragging: false, _imgStartX: 0, _imgStartY: 0,
     resetImgZoom() { this.imgScale = 1; this.imgTx = 0; this.imgTy = 0; },
     imgWheel(e) { const f = e.deltaY < 0 ? 1.15 : 1/1.15; this.imgScale = Math.min(Math.max(this.imgScale * f, 0.3), 10); },
@@ -171,6 +172,7 @@ function yearData() {
           tag_ids: [],
           currency: 'EUR',
           amount_ht: '',
+          tva_rate: '',
           vat_amount: '',
           amount_ttc: '',
           amount_ttc_eur: '',
@@ -183,17 +185,31 @@ function yearData() {
       this.batchResults = [];
       this.openTagPicker = false;
       this.resetImgZoom();
+      this._resetApplied();
       this.batchModal = true;
+    },
+    autoCalcTax() {
+      const item = this.batchFiles[this.batchIdx];
+      if (!item) return;
+      const ht = parseFloat(item.amount_ht);
+      const rate = parseFloat(item.tva_rate);
+      if (!isNaN(ht) && !isNaN(rate) && rate >= 0) {
+        const vat = parseFloat((ht * rate / 100).toFixed(2));
+        item.vat_amount = vat.toFixed(2);
+        item.amount_ttc = (ht + vat).toFixed(2);
+      }
     },
     applyToAll(field) {
       const val = this.batchFiles[this.batchIdx][field];
       this.batchFiles.forEach(f => { f[field] = Array.isArray(val) ? [...val] : val; });
+      this.batchApplied[field] = true;
     },
+    _resetApplied() { this.batchApplied = { category: false, correspondent_id: false, document_type_id: false, tag_ids: false }; },
     batchNext() {
-      if (this.batchIdx < this.batchFiles.length - 1) { this.batchIdx++; this.openTagPicker = false; this.resetImgZoom(); }
+      if (this.batchIdx < this.batchFiles.length - 1) { this.batchIdx++; this.openTagPicker = false; this.resetImgZoom(); this._resetApplied(); }
     },
     batchPrev() {
-      if (this.batchIdx > 0) { this.batchIdx--; this.openTagPicker = false; this.resetImgZoom(); }
+      if (this.batchIdx > 0) { this.batchIdx--; this.openTagPicker = false; this.resetImgZoom(); this._resetApplied(); }
     },
     batchDeleteCurrent() {
       const item = this.batchFiles[this.batchIdx];
@@ -292,6 +308,7 @@ function yearData() {
       item.tag_ids = item.tag_ids.includes(tagId)
         ? item.tag_ids.filter(id => id !== tagId)
         : [...item.tag_ids, tagId];
+      this.batchApplied.tag_ids = false;
     },
 
     // Bulk selection
@@ -836,16 +853,18 @@ function yearData() {
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-xs font-medium text-slate-600">Catégorie</label>
               <button type="button" x-show="batchFiles.length > 1" @click="applyToAll('category')"
-                      class="text-[10px] text-indigo-400 hover:text-indigo-600 transition-colors">Appliquer à tous</button>
+                      :class="batchApplied.category ? 'text-emerald-500 cursor-default' : 'text-indigo-400 hover:text-indigo-600'"
+                      class="text-[10px] transition-colors"
+                      x-text="batchApplied.category ? 'Appliqué ✓' : 'Appliquer à tous'"></button>
             </div>
             <div class="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
-              <button type="button" @click="batchFiles[batchIdx].category = 'depense'"
+              <button type="button" @click="batchFiles[batchIdx].category = 'depense'; batchApplied.category = false"
                       :class="batchFiles[batchIdx].category === 'depense' ? 'bg-red-50 text-red-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
                       class="flex-1 py-2 transition-colors border-r border-slate-200">Dépense</button>
-              <button type="button" @click="batchFiles[batchIdx].category = 'recette'"
+              <button type="button" @click="batchFiles[batchIdx].category = 'recette'; batchApplied.category = false"
                       :class="batchFiles[batchIdx].category === 'recette' ? 'bg-green-50 text-green-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
                       class="flex-1 py-2 transition-colors border-r border-slate-200">Recette</button>
-              <button type="button" @click="batchFiles[batchIdx].category = 'autre'"
+              <button type="button" @click="batchFiles[batchIdx].category = 'autre'; batchApplied.category = false"
                       :class="batchFiles[batchIdx].category === 'autre' ? 'bg-slate-100 text-slate-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
                       class="flex-1 py-2 transition-colors">Autre</button>
             </div>
@@ -856,9 +875,12 @@ function yearData() {
             <div class="flex items-center justify-between mb-1">
               <label class="text-xs font-medium text-slate-600">Correspondant</label>
               <button type="button" x-show="batchFiles.length > 1" @click="applyToAll('correspondent_id')"
-                      class="text-[10px] text-indigo-400 hover:text-indigo-600 transition-colors">Appliquer à tous</button>
+                      :class="batchApplied.correspondent_id ? 'text-emerald-500 cursor-default' : 'text-indigo-400 hover:text-indigo-600'"
+                      class="text-[10px] transition-colors"
+                      x-text="batchApplied.correspondent_id ? 'Appliqué ✓' : 'Appliquer à tous'"></button>
             </div>
             <select x-model="batchFiles[batchIdx].correspondent_id"
+                    @change="batchApplied.correspondent_id = false"
                     class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
               <option value=""></option>
               <template x-for="c in correspondents" :key="c.id">
@@ -872,9 +894,12 @@ function yearData() {
             <div class="flex items-center justify-between mb-1">
               <label class="text-xs font-medium text-slate-600">Type de document</label>
               <button type="button" x-show="batchFiles.length > 1" @click="applyToAll('document_type_id')"
-                      class="text-[10px] text-indigo-400 hover:text-indigo-600 transition-colors">Appliquer à tous</button>
+                      :class="batchApplied.document_type_id ? 'text-emerald-500 cursor-default' : 'text-indigo-400 hover:text-indigo-600'"
+                      class="text-[10px] transition-colors"
+                      x-text="batchApplied.document_type_id ? 'Appliqué ✓' : 'Appliquer à tous'"></button>
             </div>
             <select x-model="batchFiles[batchIdx].document_type_id"
+                    @change="batchApplied.document_type_id = false"
                     class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
               <option value=""></option>
               <template x-for="dt in docTypes" :key="dt.id">
@@ -888,7 +913,9 @@ function yearData() {
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-xs font-medium text-slate-600">Tags</label>
               <button type="button" x-show="batchFiles.length > 1" @click="applyToAll('tag_ids')"
-                      class="text-[10px] text-indigo-400 hover:text-indigo-600 transition-colors">Appliquer à tous</button>
+                      :class="batchApplied.tag_ids ? 'text-emerald-500 cursor-default' : 'text-indigo-400 hover:text-indigo-600'"
+                      class="text-[10px] transition-colors"
+                      x-text="batchApplied.tag_ids ? 'Appliqué ✓' : 'Appliquer à tous'"></button>
             </div>
             <div class="relative">
               <button type="button" @click="openTagPicker = !openTagPicker"
@@ -917,7 +944,7 @@ function yearData() {
           <div x-show="batchFiles[batchIdx]?.category !== 'autre'" class="space-y-3 pt-1 border-t border-slate-100">
             <label class="block text-xs font-medium text-slate-600">Montants</label>
 
-            <!-- Devise + HT + TVA -->
+            <!-- Devise + HT + Taux TVA -->
             <div class="grid grid-cols-3 gap-2">
               <div>
                 <label class="block text-xs text-slate-400 mb-1">Devise</label>
@@ -938,42 +965,68 @@ function yearData() {
                        class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
               </div>
               <div>
-                <label class="block text-xs text-slate-400 mb-1">TVA</label>
-                <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].vat_amount" placeholder="0.00"
+                <label class="block text-xs text-slate-400 mb-1">Taux TVA %</label>
+                <input type="number" step="0.1" min="0" max="100" x-model="batchFiles[batchIdx].tva_rate" placeholder="0"
                        class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
               </div>
             </div>
 
-            <!-- TTC + équivalent EUR (si devise étrangère) -->
-            <div class="grid grid-cols-2 gap-2">
+            <!-- TVA montant + TTC (même grille que la ligne du dessus) -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="flex items-end">
+                <button type="button" @click="autoCalcTax()"
+                        title="Calculer TVA et TTC depuis HT × taux"
+                        class="px-2 h-9 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                </button>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">TVA</label>
+                <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].vat_amount" placeholder="0.00"
+                       class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              </div>
               <div>
                 <label class="block text-xs text-slate-400 mb-1">TTC</label>
                 <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].amount_ttc" placeholder="0.00"
                        class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
               </div>
-              <div x-show="batchFiles[batchIdx]?.currency !== 'EUR'">
-                <label class="block text-xs text-slate-400 mb-1">Équivalent EUR</label>
-                <div class="flex gap-1">
-                  <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].amount_ttc_eur" placeholder="0.00"
-                         class="flex-1 h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                  <button type="button" @click="fetchConversion()" :disabled="fetchingRate"
-                          title="Recalculer via BCE (taux à la date de paiement ou du jour)"
-                          class="px-2.5 h-9 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 disabled:opacity-50 transition-colors shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
-                         class="w-4 h-4" :class="fetchingRate ? 'animate-spin' : ''">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
-                  </button>
-                </div>
-                <p class="text-xs text-slate-400 mt-1">Taux BCE à la date de paiement (ou du jour)</p>
+            </div>
+
+            <!-- Équivalent EUR (si devise étrangère) -->
+            <div x-show="batchFiles[batchIdx]?.currency !== 'EUR'">
+              <label class="block text-xs text-slate-400 mb-1">Équivalent EUR</label>
+              <div class="flex gap-1">
+                <input type="number" step="0.01" min="0" x-model="batchFiles[batchIdx].amount_ttc_eur" placeholder="0.00"
+                       class="flex-1 h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <button type="button" @click="fetchConversion()" :disabled="fetchingRate"
+                        title="Recalculer via BCE (taux à la date de paiement ou du jour)"
+                        class="px-2.5 h-9 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 disabled:opacity-50 transition-colors shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                       class="w-4 h-4" :class="fetchingRate ? 'animate-spin' : ''">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                </button>
               </div>
+              <p class="text-xs text-slate-400 mt-1">Taux BCE à la date de paiement (ou du jour)</p>
             </div>
 
             <!-- Date de paiement -->
             <div>
               <label class="block text-xs text-slate-400 mb-1">Date de paiement</label>
-              <input type="date" x-model="batchFiles[batchIdx].payment_date"
-                     class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <div class="flex gap-1">
+                <input type="date" x-model="batchFiles[batchIdx].payment_date"
+                       class="flex-1 h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <button type="button"
+                        @click="batchFiles[batchIdx].payment_date = batchFiles[batchIdx].date"
+                        title="Copier la date du document"
+                        class="px-2 h-9 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-500 hover:border-indigo-200 transition-colors shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 9.75h4.875a2.625 2.625 0 0 1 0 5.25H12M8.25 9.75 10.5 7.5M8.25 9.75 10.5 12m9-7.243V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0c1.1.128 1.907 1.077 1.907 2.185Z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
