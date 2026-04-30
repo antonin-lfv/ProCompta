@@ -444,7 +444,11 @@
             </div>
             <!-- Catégorie -->
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1.5">Catégorie</label>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-xs font-medium text-slate-600">Catégorie</label>
+                <button type="button" x-show="batchFiles.length > 1" @click="applyToAll('category')"
+                        class="text-[10px] text-indigo-400 hover:text-indigo-600 transition-colors">Appliquer à tous</button>
+              </div>
               <div class="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
                 <button type="button" @click="batchFiles[batchIdx].category = 'depense'"
                         :class="batchFiles[batchIdx].category === 'depense' ? 'bg-red-50 text-red-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
@@ -459,7 +463,11 @@
             </div>
             <!-- Correspondant -->
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Correspondant</label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs font-medium text-slate-600">Correspondant</label>
+                <button type="button" x-show="batchFiles.length > 1" @click="applyToAll('correspondent_id')"
+                        class="text-[10px] text-indigo-400 hover:text-indigo-600 transition-colors">Appliquer à tous</button>
+              </div>
               <select x-model="batchFiles[batchIdx].correspondent_id"
                       class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 <option value=""></option>
@@ -470,7 +478,11 @@
             </div>
             <!-- Type de document -->
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Type de document</label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs font-medium text-slate-600">Type de document</label>
+                <button type="button" x-show="batchFiles.length > 1" @click="applyToAll('document_type_id')"
+                        class="text-[10px] text-indigo-400 hover:text-indigo-600 transition-colors">Appliquer à tous</button>
+              </div>
               <select x-model="batchFiles[batchIdx].document_type_id"
                       class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 <option value=""></option>
@@ -481,7 +493,11 @@
             </div>
             <!-- Tags -->
             <div x-show="tags.length > 0">
-              <label class="block text-xs font-medium text-slate-600 mb-1.5">Tags</label>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-xs font-medium text-slate-600">Tags</label>
+                <button type="button" x-show="batchFiles.length > 1" @click="applyToAll('tag_ids')"
+                        class="text-[10px] text-indigo-400 hover:text-indigo-600 transition-colors">Appliquer à tous</button>
+              </div>
               <div class="relative">
                 <button type="button" @click="openTagPicker = !openTagPicker"
                         :class="batchFiles[batchIdx]?.tag_ids.length > 0 ? 'border-indigo-300 bg-indigo-50 text-indigo-600' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
@@ -794,7 +810,7 @@
               previewUrl: preview?.url ?? null,
               previewKind: preview?.kind ?? null,
               title: file.name.replace(/\.[^/.]+$/, ''),
-              date: this.todayISO,
+              date: new Date(file.lastModified).toISOString().split('T')[0],
               category: 'autre',
               correspondent_id: '',
               document_type_id: '',
@@ -814,6 +830,10 @@
           this.openTagPicker = false;
           this.resetImgZoom();
           this.batchModal = true;
+        },
+        applyToAll(field) {
+          const val = this.batchFiles[this.batchIdx][field];
+          this.batchFiles.forEach(f => { f[field] = Array.isArray(val) ? [...val] : val; });
         },
         batchNext() { if (this.batchIdx < this.batchFiles.length - 1) { this.batchIdx++; this.openTagPicker = false; this.resetImgZoom(); } },
         batchPrev() { if (this.batchIdx > 0) { this.batchIdx--; this.openTagPicker = false; this.resetImgZoom(); } },
