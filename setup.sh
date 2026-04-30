@@ -91,7 +91,7 @@ if grep -q "procompta.local" /etc/hosts 2>/dev/null; then
 else
   warn "Pour accéder à l'app via http://procompta.local, une ligne doit être ajoutée à /etc/hosts (nécessite sudo)."
   read -r -p "  Autoriser ? [O/n] : " HOSTS_CONFIRM
-  if [[ "${HOSTS_CONFIRM,,}" != "n" ]]; then
+  if [[ "$HOSTS_CONFIRM" != "n" && "$HOSTS_CONFIRM" != "N" ]]; then
     sudo sh -c 'echo "127.0.0.1 procompta.local" >> /etc/hosts'
     success "procompta.local ajouté dans /etc/hosts."
     USE_LOCAL_DOMAIN=true
