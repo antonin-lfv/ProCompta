@@ -50,7 +50,7 @@ Il s'adresse aux **indépendants, micro-entrepreneurs et petites structures** qu
 **Prérequis : Docker Desktop installé et démarré.**
 
 > [!NOTE]
-> Si Docker Desktop n'est pas encore installé, téléchargez-le sur [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/).
+> Si Docker Desktop n'est pas encore installé, téléchargez-le sur [https://docs.docker.com/get-docker/](https://docs.docker.com/get-docker/).
 
 ```bash
 git clone https://github.com/antonin-lfv/ProCompta.git
