@@ -371,7 +371,7 @@
       @keydown.arrow-left.window="if(!_isYearPage() && batchState==='editing') batchPrev()"
       @keydown.arrow-right.window="if(!_isYearPage() && batchState==='editing') batchNext()"
     >
-      <div class="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden" style="height:85vh;min-height:500px;width:100%;max-width:56rem">
+      <div class="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden" style="height:85vh;min-height:500px;width:100%;max-width:min(90vw,72rem)">
 
         <!-- Header -->
         <div class="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
@@ -401,9 +401,21 @@
         <template x-if="batchState === 'editing' && batchFiles.length > 0">
         <div class="flex flex-1 min-h-0 overflow-hidden">
           <!-- Panneau preview -->
-          <div class="shrink-0 border-r border-slate-100 flex flex-col items-center justify-center bg-slate-50 overflow-hidden" style="width:28rem">
-            <div x-show="batchFiles[batchIdx]?.previewKind === 'image'" class="w-full h-full flex items-center justify-center p-3">
-              <img :src="batchFiles[batchIdx]?.previewUrl || ''" class="max-h-full max-w-full rounded-lg object-contain shadow" alt="">
+          <div class="shrink-0 border-r border-slate-100 flex flex-col items-center justify-center bg-slate-50 overflow-hidden" style="width:45%">
+            <div x-show="batchFiles[batchIdx]?.previewKind === 'image'" class="w-full h-full overflow-hidden relative"
+                 :class="_imgDragging ? 'cursor-grabbing' : 'cursor-grab'"
+                 @wheel.prevent="imgWheel($event)"
+                 @mousedown.prevent="imgMousedown($event)"
+                 @mousemove="imgMousemove($event)"
+                 @mouseup="imgMouseup()"
+                 @mouseleave="imgMouseup()"
+                 @dblclick="resetImgZoom()">
+              <img :src="batchFiles[batchIdx]?.previewUrl || ''"
+                   class="rounded-lg shadow select-none pointer-events-none absolute"
+                   :style="`top:50%;left:50%;transform:translate(calc(-50% + ${imgTx}px),calc(-50% + ${imgTy}px)) scale(${imgScale});transform-origin:center;`"
+                   alt="">
+              <span class="absolute bottom-2 right-2 text-[10px] text-slate-400 bg-white/70 rounded px-1.5 py-0.5 pointer-events-none select-none"
+                    x-show="imgScale === 1">molette pour zoomer · glisser pour déplacer</span>
             </div>
             <div x-show="batchFiles[batchIdx]?.previewKind === 'pdf'" class="w-full h-full">
               <embed :src="batchFiles[batchIdx]?.previewUrl || ''" type="application/pdf" class="w-full h-full" style="min-height:220px">
@@ -693,6 +705,12 @@
         docTypes: [],
         tags: [],
         todayISO: new Date().toISOString().split('T')[0],
+        imgScale: 1, imgTx: 0, imgTy: 0, _imgDragging: false, _imgStartX: 0, _imgStartY: 0,
+        resetImgZoom() { this.imgScale = 1; this.imgTx = 0; this.imgTy = 0; },
+        imgWheel(e) { const f = e.deltaY < 0 ? 1.15 : 1/1.15; this.imgScale = Math.min(Math.max(this.imgScale * f, 0.3), 10); },
+        imgMousedown(e) { this._imgDragging = true; this._imgStartX = e.clientX - this.imgTx; this._imgStartY = e.clientY - this.imgTy; },
+        imgMousemove(e) { if (!this._imgDragging) return; this.imgTx = e.clientX - this._imgStartX; this.imgTy = e.clientY - this._imgStartY; },
+        imgMouseup() { this._imgDragging = false; },
 
         _isYearPage() { return window.location.pathname.startsWith('/year/'); },
 
@@ -794,10 +812,11 @@
           this.batchState = 'editing';
           this.batchResults = [];
           this.openTagPicker = false;
+          this.resetImgZoom();
           this.batchModal = true;
         },
-        batchNext() { if (this.batchIdx < this.batchFiles.length - 1) { this.batchIdx++; this.openTagPicker = false; } },
-        batchPrev() { if (this.batchIdx > 0) { this.batchIdx--; this.openTagPicker = false; } },
+        batchNext() { if (this.batchIdx < this.batchFiles.length - 1) { this.batchIdx++; this.openTagPicker = false; this.resetImgZoom(); } },
+        batchPrev() { if (this.batchIdx > 0) { this.batchIdx--; this.openTagPicker = false; this.resetImgZoom(); } },
         batchDeleteCurrent() {
           const item = this.batchFiles[this.batchIdx];
           if (item?.previewKind === 'pdf' && item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
