@@ -171,44 +171,42 @@ function docsData() {
        x-transition:leave-start="opacity-100 translate-y-0"
        x-transition:leave-end="opacity-0 -translate-y-2">
     <form method="GET" action="/documents"
-          class="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          class="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap items-end gap-3">
       {% if no_type %}<input type="hidden" name="no_type" value="1">{% endif %}
       {% if no_correspondent %}<input type="hidden" name="no_correspondent" value="1">{% endif %}
       {% if show_archived %}<input type="hidden" name="show_archived" value="1">{% endif %}
       {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
-      <div>
+      <div class="w-36">
         <label class="block text-xs font-medium text-slate-600 mb-1">Date début</label>
         <input type="date" name="date_from" value="{{ date_from }}"
                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
       </div>
-      <div>
+      <div class="w-36">
         <label class="block text-xs font-medium text-slate-600 mb-1">Date fin</label>
         <input type="date" name="date_to" value="{{ date_to }}"
                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
       </div>
-      <div>
+      <div class="flex-1 min-w-[120px]">
         <label class="block text-xs font-medium text-slate-600 mb-1">Montant min (€)</label>
         <input type="number" name="amount_min" value="{{ amount_min }}" min="0" step="0.01" placeholder="0"
                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
       </div>
-      <div class="flex gap-2">
-        <div class="flex-1">
-          <label class="block text-xs font-medium text-slate-600 mb-1">Montant max (€)</label>
-          <input type="number" name="amount_max" value="{{ amount_max }}" min="0" step="0.01" placeholder="∞"
-                 class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        </div>
-        <div class="flex items-end gap-2">
-          <button type="submit"
-                  class="h-10 px-4 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap">
-            Filtrer
-          </button>
-          {% if has_filters %}
-          <a href="/documents{% if no_type %}?no_type=1{% elif no_correspondent %}?no_correspondent=1{% elif show_archived %}?show_archived=1{% endif %}"
-             class="h-10 px-3 flex items-center bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors whitespace-nowrap">
-            Réinitialiser
-          </a>
-          {% endif %}
-        </div>
+      <div class="flex-1 min-w-[120px]">
+        <label class="block text-xs font-medium text-slate-600 mb-1">Montant max (€)</label>
+        <input type="number" name="amount_max" value="{{ amount_max }}" min="0" step="0.01" placeholder="∞"
+               class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="submit"
+                class="h-10 px-4 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap">
+          Filtrer
+        </button>
+        {% if has_filters %}
+        <a href="/documents{% if no_type %}?no_type=1{% elif no_correspondent %}?no_correspondent=1{% elif show_archived %}?show_archived=1{% endif %}"
+           class="h-10 px-3 flex items-center bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors whitespace-nowrap">
+          Réinitialiser
+        </a>
+        {% endif %}
       </div>
     </form>
   </div>
