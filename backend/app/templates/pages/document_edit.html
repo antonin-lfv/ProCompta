@@ -413,7 +413,7 @@ function docEditData() {
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Taux TVA (%)</label>
             <input type="text" name="vat_rate" inputmode="decimal"
-                   value="{{ doc.vat_rate if doc.vat_rate is not none else '' }}"
+                   value="{{ doc.vat_rate if (doc.vat_rate is not none and doc.vat_rate != 0) else '20' }}"
                    placeholder="20.00"
                    class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
           </div>
@@ -421,7 +421,7 @@ function docEditData() {
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <div class="flex gap-1 items-end">
+            <div class="flex gap-3 items-end">
               <button type="button" x-ref="calcTaxBtn" @click="calcTax()"
                       title="Calculer TVA et TTC depuis HT × taux"
                       class="px-2 h-9 flex items-center rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors shrink-0">

@@ -172,7 +172,7 @@ function yearData() {
           tag_ids: [],
           currency: 'EUR',
           amount_ht: '',
-          tva_rate: '',
+          tva_rate: '20',
           vat_amount: '',
           amount_ttc: '',
           amount_ttc_eur: '',
@@ -879,10 +879,10 @@ function yearData() {
                       x-text="batchApplied.category ? 'Appliqué ✓' : 'Appliquer à tous'"></button>
             </div>
             <div class="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
-              <button type="button" @click="batchFiles[batchIdx].category = 'depense'; batchApplied.category = false"
+              <button type="button" @click="batchFiles[batchIdx].category = 'depense'; batchApplied.category = false; if (!batchFiles[batchIdx].tva_rate) batchFiles[batchIdx].tva_rate = '20'"
                       :class="batchFiles[batchIdx].category === 'depense' ? 'bg-red-50 text-red-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
                       class="flex-1 py-2 transition-colors border-r border-slate-200">Dépense</button>
-              <button type="button" @click="batchFiles[batchIdx].category = 'recette'; batchApplied.category = false"
+              <button type="button" @click="batchFiles[batchIdx].category = 'recette'; batchApplied.category = false; if (!batchFiles[batchIdx].tva_rate) batchFiles[batchIdx].tva_rate = '20'"
                       :class="batchFiles[batchIdx].category === 'recette' ? 'bg-green-50 text-green-600 font-medium' : 'bg-white text-slate-500 hover:bg-slate-50'"
                       class="flex-1 py-2 transition-colors border-r border-slate-200">Recette</button>
               <button type="button" @click="batchFiles[batchIdx].category = 'autre'; batchApplied.category = false"
@@ -987,7 +987,7 @@ function yearData() {
               </div>
               <div>
                 <label class="block text-xs text-slate-400 mb-1">Taux TVA %</label>
-                <input type="number" step="0.1" min="0" max="100" x-model="batchFiles[batchIdx].tva_rate" placeholder="0"
+                <input type="number" step="0.1" min="0" max="100" x-model="batchFiles[batchIdx].tva_rate" placeholder="20"
                        class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
               </div>
             </div>
