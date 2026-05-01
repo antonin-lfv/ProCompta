@@ -90,6 +90,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ProCompta", version="0.1.0", lifespan=lifespan)
 
+app.add_middleware(AuthMiddleware)
+
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+previews_dir = Path(settings.storage_path) / "previews"
+previews_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/previews", StaticFiles(directory=previews_dir), name="previews")
+
+app.include_router(auth.router)
+app.include_router(profile.router)
+app.include_router(pages.router)
+app.include_router(correspondents.router, prefix="/api")
+app.include_router(document_types.router, prefix="/api")
+app.include_router(tags.router, prefix="/api")
+app.include_router(documents.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
+app.include_router(backup.router, prefix="/api")
+
 
 _ERROR_MESSAGES = {
     400: ("Requête invalide", "Les données envoyées sont incorrectes ou incomplètes."),
