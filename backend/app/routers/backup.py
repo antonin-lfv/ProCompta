@@ -182,11 +182,15 @@ async def restore_backup(
     if restore.returncode != 0:
         raise HTTPException(status_code=500, detail=f"Restauration échouée : {restore.stderr.decode()}")
 
-    storage = Path(settings.storage_path)
+    storage = Path(settings.storage_path).resolve()
     for name in zf.namelist():
         if name.startswith("storage/") and not name.endswith("/"):
             rel = name[len("storage/"):]
-            target = storage / rel
+            target = (storage / rel).resolve()
+            try:
+                target.relative_to(storage)
+            except ValueError:
+                continue  # zip slip attempt — skip
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(zf.read(name))
 

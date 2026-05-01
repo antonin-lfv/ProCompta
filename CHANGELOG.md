@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.4.0] - 2026-05-01
+
+### Corrigé — Bugs comptables
+- **`vat_rate=0` écrasé à 20 à la sauvegarde** - le champ Taux TVA affichait 20 même quand la valeur stockée était 0, causant une corruption silencieuse des données à chaque sauvegarde sans modification du champ ; la condition `!= 0` a été supprimée de la logique d'affichage. Le modèle `vat_rate` n'a plus de valeur Python par défaut (était `Decimal("0.00")`) : les nouveaux documents ont `vat_rate=NULL` et affichent 20 comme suggestion, les documents existants avec 0% TVA affichent 0.
+- **Faux positif alerte devise étrangère** - `has_foreign_currency` utilisait `not d.amount_ttc_eur` au lieu de `d.amount_ttc_eur is None`, déclenchant le bandeau "montant EUR manquant" pour les documents avec un équivalent EUR égal à zéro
+- **`prorata_pct` non borné** - aucune validation n'empêchait de stocker un prorata > 100% ou < 0% ; validation ajoutée côté Pydantic (schémas `DocumentCreate` et `DocumentUpdate`) et côté form POST (clamp 0–100)
+
+### Corrigé — Bugs fonctionnels
+- **Suppression groupée sans confirmation** - `bulkDelete()` supprimait les documents sélectionnés sans demander de confirmation ; `confirm()` ajouté avec le nombre de documents concernés
+- **`tag_uuids` UUID malformé → HTTP 500** - le formulaire d'édition levait `ValueError` non capturé sur un UUID invalide dans `tag_ids` ; remplacé par `_uuid()` qui retourne `None` silencieusement
+- **Erreurs silencieuses dans la configuration** - la création d'un correspondant, type ou tag en doublon (slug/nom) redirige désormais avec `?error=duplicate` et affiche un message d'erreur visible
+- **`createTag()` sans feedback** - la création rapide d'un tag depuis le formulaire d'édition n'affichait rien en cas d'erreur (doublon, réseau) ; un `alert()` est maintenant déclenché
+
+### Corrigé — Bugs visuels
+- **`has_filters` incomplet** - les filtres `no_type`, `no_correspondent` et `show_archived` n'activaient pas l'indicateur visuel de filtre sur la vue "Tous les documents"
+- **`data-amount` avec `amount_ttc_eur=0`** - les stats de section recalculées après suppression DOM utilisaient `not doc.amount_ttc_eur` (falsy pour 0), entraînant un total affiché incorrect pour les documents multi-devises avec un équivalent EUR de zéro
+
+### Sécurité
+- **Zip Slip dans la restauration backup** - une archive malveillante contenant des chemins avec `../` pouvait écraser des fichiers hors du répertoire de stockage ; `target.resolve().relative_to(storage.resolve())` valide maintenant le chemin avant extraction
+- **Fuite mémoire `_LOGIN_ATTEMPTS`** - le dictionnaire de rate limiting utilisait `defaultdict(list)` et créait une entrée pour chaque IP accédant au login ; migré vers un `dict` standard avec nettoyage paresseux des entrées expirées
+
+### Technique
+- `@app.on_event("startup")` déprécié → migré vers `@asynccontextmanager lifespan`
+- `_is_complete`, `_missing_body`, `_sync_notification` dupliqués dans `documents.py` et `pages.py` → centralisés dans `app/document_utils.py`
+- `file_path` supprimé de `DocumentResponse` (chemin interne du système de fichiers inutile côté client)
+
+---
+
 ## [1.3.8] - 2026-05-01
 
 ### Ajouté

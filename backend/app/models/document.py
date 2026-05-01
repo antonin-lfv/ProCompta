@@ -53,7 +53,7 @@ class Document(Base, UUIDMixin, TimestampMixin):
 
     amount_ht: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     vat_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
-    vat_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True, default=Decimal("0.00"))
+    vat_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     prorata_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     amount_ttc: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     amount_ttc_eur: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

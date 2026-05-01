@@ -391,6 +391,8 @@ function yearData() {
     },
     async bulkDelete() {
       if (!this.selectedIds.length) return;
+      const n = this.selectedIds.length;
+      if (!confirm(`Supprimer définitivement ${n} document${n > 1 ? 's' : ''} ? Cette action est irréversible.`)) return;
       const ids = [...this.selectedIds];
       const resp = await fetch('/api/documents/bulk-delete', {
         method: 'POST',
@@ -631,7 +633,7 @@ function yearData() {
     <tbody class="divide-y divide-slate-100">
       {% for doc in docs %}
       <tr class="hover:bg-slate-50 transition-colors group cursor-pointer" id="doc-{{ doc.id }}"
-          data-amount="{{ doc.amount_ttc_eur if (doc.currency != 'EUR' and doc.amount_ttc_eur) else (doc.amount_ttc or 0) }}"
+          data-amount="{{ doc.amount_ttc_eur if (doc.currency != 'EUR' and doc.amount_ttc_eur is not none) else (doc.amount_ttc or 0) }}"
           {% if paginate %}x-show="rowVisible('{{ section }}', {{ loop.index0 }})"{% endif %}
           :class="isSelected('{{ doc.id }}') ? 'bg-indigo-50/60' : ''"
           @click="if(!$event.target.closest('button, a, input')) window.location.href='/documents/{{ doc.id }}/edit?back={{ return_url_encoded }}'">

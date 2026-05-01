@@ -90,6 +90,9 @@ function docEditData() {
         const tag = await resp.json();
         this.all.push({ id: tag.id, name: tag.name, color: tag.color });
         this.add({ id: tag.id, name: tag.name, color: tag.color });
+      } else {
+        const d = await resp.json().catch(() => ({}));
+        alert(d.detail || 'Ce tag existe déjà ou une erreur est survenue.');
       }
     }
   };
@@ -417,7 +420,7 @@ function docEditData() {
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Taux TVA (%)</label>
             <input type="text" name="vat_rate" inputmode="decimal"
-                   value="{{ doc.vat_rate if (doc.vat_rate is not none and doc.vat_rate != 0) else '20' }}"
+                   value="{{ doc.vat_rate if doc.vat_rate is not none else '20' }}"
                    placeholder="20.00"
                    class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
           </div>

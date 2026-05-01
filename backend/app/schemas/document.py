@@ -2,12 +2,18 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.models.document import CategoryEnum
 from app.schemas.correspondent import CorrespondentResponse
 from app.schemas.document_type import DocumentTypeResponse
 from app.schemas.tag import TagResponse
+
+
+def _validate_prorata(v: Decimal | None) -> Decimal | None:
+    if v is not None and not (Decimal("0") <= v <= Decimal("100")):
+        raise ValueError("prorata_pct doit être compris entre 0 et 100")
+    return v
 
 
 class DocumentCreate(BaseModel):
@@ -17,7 +23,7 @@ class DocumentCreate(BaseModel):
     payment_date: date | None = None
     amount_ht: Decimal | None = None
     vat_amount: Decimal | None = None
-    vat_rate: Decimal = Decimal("0.00")
+    vat_rate: Decimal | None = None
     prorata_pct: Decimal | None = None
     amount_ttc: Decimal | None = None
     amount_ttc_eur: Decimal | None = None
@@ -26,6 +32,11 @@ class DocumentCreate(BaseModel):
     correspondent_id: uuid.UUID | None = None
     document_type_id: uuid.UUID | None = None
     tag_ids: list[uuid.UUID] = []
+
+    @field_validator("prorata_pct")
+    @classmethod
+    def validate_prorata(cls, v: Decimal | None) -> Decimal | None:
+        return _validate_prorata(v)
 
 
 class DocumentUpdate(BaseModel):
@@ -46,6 +57,11 @@ class DocumentUpdate(BaseModel):
     document_type_id: uuid.UUID | None = None
     tag_ids: list[uuid.UUID] | None = None
 
+    @field_validator("prorata_pct")
+    @classmethod
+    def validate_prorata(cls, v: Decimal | None) -> Decimal | None:
+        return _validate_prorata(v)
+
 
 class DocumentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -53,7 +69,6 @@ class DocumentResponse(BaseModel):
     id: uuid.UUID
     title: str
     category: CategoryEnum
-    file_path: str
     file_hash: str
     mime_type: str
     file_size: int

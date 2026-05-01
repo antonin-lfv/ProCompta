@@ -16,11 +16,11 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_session
+from app.document_utils import is_complete as _is_complete, missing_body as _missing_body, sync_notification as _sync_notification
 from app.models.correspondent import Correspondent
 from app.models.document import CategoryEnum, Document, document_tags
 from app.models.document_activity import ActivityEventEnum, DocumentActivity
 from app.models.document_type import DocumentType
-from app.models.notification import Notification, NotificationTypeEnum
 from app.models.tag import Tag
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
 from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, hash_bytes, save_file_bytes
@@ -71,55 +71,6 @@ async def _fetch_ecb_rate(currency: str, rate_date: date) -> Decimal | None:
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-
-def _is_complete(doc: Document) -> bool:
-    return bool(
-        doc.document_type_id
-        and doc.correspondent_id
-        and (doc.category == CategoryEnum.autre or doc.amount_ttc)
-    )
-
-
-def _missing_body(doc: Document) -> str:
-    missing = []
-    if not doc.correspondent_id:
-        missing.append("correspondant")
-    if not doc.document_type_id:
-        missing.append("type")
-    if doc.category != CategoryEnum.autre and not doc.amount_ttc:
-        missing.append("montant")
-    return "Sans " + " · sans ".join(missing) if missing else "Informations incomplètes"
-
-
-async def _sync_notification(doc: Document, session: AsyncSession) -> None:
-    unread_result = await session.execute(
-        select(Notification).where(Notification.document_id == doc.id, Notification.read == False)
-    )
-    unread = list(unread_result.scalars().all())
-
-    if _is_complete(doc):
-        for n in unread:
-            n.read = True
-    else:
-        if not unread:
-            existing = await session.scalar(
-                select(Notification)
-                .where(Notification.document_id == doc.id)
-                .order_by(Notification.created_at.desc())
-                .limit(1)
-            )
-            if existing:
-                existing.read = False
-                existing.title = f"« {doc.title} » - informations manquantes"
-                existing.body = _missing_body(doc)
-            else:
-                session.add(Notification(
-                    type=NotificationTypeEnum.incomplete_document,
-                    document_id=doc.id,
-                    title=f"« {doc.title} » - informations manquantes",
-                    body=_missing_body(doc),
-                ))
-    await session.commit()
 
 
 # Synonymes anglais pour les types de document courants

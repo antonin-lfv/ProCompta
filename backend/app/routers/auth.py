@@ -1,5 +1,4 @@
 import time
-from collections import defaultdict
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,18 +13,21 @@ from app.templating import templates
 
 router = APIRouter(tags=["auth"])
 
-_LOGIN_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
+_LOGIN_ATTEMPTS: dict[str, list[float]] = {}
 _MAX_ATTEMPTS = 10
 _WINDOW = 60  # secondes
 
 
 def _check_rate_limit(ip: str) -> bool:
     now = time.monotonic()
-    attempts = [t for t in _LOGIN_ATTEMPTS[ip] if now - t < _WINDOW]
-    _LOGIN_ATTEMPTS[ip] = attempts
-    if len(attempts) >= _MAX_ATTEMPTS:
+    recent = [t for t in _LOGIN_ATTEMPTS.get(ip, []) if now - t < _WINDOW]
+    if not recent:
+        _LOGIN_ATTEMPTS.pop(ip, None)  # purge stale entry
+    if len(recent) >= _MAX_ATTEMPTS:
+        _LOGIN_ATTEMPTS[ip] = recent
         return False
-    _LOGIN_ATTEMPTS[ip].append(now)
+    recent.append(now)
+    _LOGIN_ATTEMPTS[ip] = recent
     return True
 
 

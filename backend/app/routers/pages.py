@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_session
+from app.document_utils import is_complete as _is_complete, missing_body as _missing_body, sync_notification as _sync_notification_pages
 from app.models.correspondent import Correspondent
 from app.models.document import CategoryEnum, Document, document_tags
 from app.models.document_activity import ActivityEventEnum, DocumentActivity
@@ -109,55 +110,6 @@ _filing_date = func.coalesce(Document.payment_date, Document.document_date)
 _CAT_LABELS = {"depense": "Dépenses", "recette": "Recettes", "autre": "Autres"}
 _CAT_ORDER  = {"depense": 0, "recette": 1, "autre": 2}
 
-
-def _is_complete(doc: Document) -> bool:
-    return bool(
-        doc.document_type_id
-        and doc.correspondent_id
-        and (doc.category == CategoryEnum.autre or doc.amount_ttc)
-    )
-
-
-def _missing_body(doc: Document) -> str:
-    missing = []
-    if not doc.correspondent_id:
-        missing.append("correspondant")
-    if not doc.document_type_id:
-        missing.append("type")
-    if doc.category != CategoryEnum.autre and not doc.amount_ttc:
-        missing.append("montant")
-    return "Sans " + " · sans ".join(missing) if missing else "Informations incomplètes"
-
-
-async def _sync_notification_pages(doc: Document, session: AsyncSession) -> None:
-    unread_result = await session.execute(
-        select(Notification).where(Notification.document_id == doc.id, Notification.read == False)
-    )
-    unread = list(unread_result.scalars().all())
-
-    if _is_complete(doc):
-        for n in unread:
-            n.read = True
-    else:
-        if not unread:
-            existing = await session.scalar(
-                select(Notification)
-                .where(Notification.document_id == doc.id)
-                .order_by(Notification.created_at.desc())
-                .limit(1)
-            )
-            if existing:
-                existing.read = False
-                existing.title = f"« {doc.title} » - informations manquantes"
-                existing.body = _missing_body(doc)
-            else:
-                session.add(Notification(
-                    type=NotificationTypeEnum.incomplete_document,
-                    document_id=doc.id,
-                    title=f"« {doc.title} » - informations manquantes",
-                    body=_missing_body(doc),
-                ))
-    await session.commit()
 
 
 _SORT_COLS: dict[str, object] = {
@@ -428,7 +380,7 @@ async def year_view(
     total_depenses = sum((_eur(d) for d in docs_depenses), Decimal("0"))
     total_recettes = sum((_eur(d) for d in docs_recettes), Decimal("0"))
     has_foreign_currency = any(
-        d.currency != "EUR" and not d.amount_ttc_eur for d in docs
+        d.currency != "EUR" and d.amount_ttc_eur is None for d in docs
     )
 
     _filter_params: list[tuple[str, str]] = [
@@ -589,7 +541,7 @@ async def documents_list(
         "date_to": date_to or "",
         "amount_min": amount_min or "",
         "amount_max": amount_max or "",
-        "has_filters": any([_date_from, _date_to, _amount_min, _amount_max, search]),
+        "has_filters": any([_date_from, _date_to, _amount_min, _amount_max, search, no_type, no_correspondent, show_archived]),
         "back_url_encoded": quote(back_url, safe=""),
         "sort": sort,
         "order": order,
@@ -657,7 +609,11 @@ async def document_update_form(
     doc.amount_ht = None if is_autre else _decimal(str(form.get("amount_ht", "")))
     doc.vat_amount = None if is_autre else _decimal(str(form.get("vat_amount", "")))
     doc.vat_rate = None if is_autre else _decimal(str(form.get("vat_rate", "")))
-    doc.prorata_pct = _decimal(str(form.get("prorata_pct", ""))) if is_depense else None
+    _raw_prorata = _decimal(str(form.get("prorata_pct", ""))) if is_depense else None
+    if _raw_prorata is not None:
+        from decimal import Decimal as _D
+        _raw_prorata = max(_D("0"), min(_D("100"), _raw_prorata))
+    doc.prorata_pct = _raw_prorata
     doc.amount_ttc = None if is_autre else _decimal(str(form.get("amount_ttc", "")))
     doc.currency = str(form.get("currency", "EUR")).strip() or "EUR"
     doc.amount_ttc_eur = None if (is_autre or doc.currency == "EUR") else _decimal(str(form.get("amount_ttc_eur", "")))
@@ -665,7 +621,7 @@ async def document_update_form(
     doc.correspondent_id = _uuid(str(form.get("correspondent_id", "")))
     doc.document_type_id = _uuid(str(form.get("document_type_id", "")))
 
-    tag_uuids = [uuid.UUID(t) for t in form.getlist("tag_ids") if t]
+    tag_uuids = [u for t in form.getlist("tag_ids") if (u := _uuid(t))]
     if tag_uuids:
         tags_result = await session.execute(select(Tag).where(Tag.id.in_(tag_uuids)))
         doc.tags = list(tags_result.scalars().all())
@@ -1067,6 +1023,7 @@ async def config(request: Request, session: AsyncSession = Depends(get_session))
         "doc_types": await _doc_types(session),
         "tags": await _tags(session),
         "tab": request.query_params.get("tab", "correspondents"),
+        "config_error": request.query_params.get("error"),
     })
 
 
@@ -1079,6 +1036,7 @@ async def config_add_correspondent(request: Request, session: AsyncSession = Dep
             await session.commit()
         except IntegrityError:
             await session.rollback()
+            return RedirectResponse("/config?tab=correspondents&error=duplicate", status_code=303)
     return RedirectResponse("/config?tab=correspondents", status_code=303)
 
 
@@ -1092,6 +1050,7 @@ async def config_add_doc_type(request: Request, session: AsyncSession = Depends(
             await session.commit()
         except IntegrityError:
             await session.rollback()
+            return RedirectResponse("/config?tab=types&error=duplicate", status_code=303)
     return RedirectResponse("/config?tab=types", status_code=303)
 
 
@@ -1105,4 +1064,5 @@ async def config_add_tag(request: Request, session: AsyncSession = Depends(get_s
             await session.commit()
         except IntegrityError:
             await session.rollback()
+            return RedirectResponse("/config?tab=tags&error=duplicate", status_code=303)
     return RedirectResponse("/config?tab=tags", status_code=303)

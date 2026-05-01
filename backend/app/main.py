@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -22,31 +23,10 @@ from app.templating import app_version, templates
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="ProCompta", version="0.1.0")
-
 BASE_DIR = Path(__file__).parent
 
-app.add_middleware(AuthMiddleware)
 
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
-
-previews_dir = Path(settings.storage_path) / "previews"
-previews_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/previews", StaticFiles(directory=previews_dir), name="previews")
-
-app.include_router(auth.router)
-app.include_router(profile.router)
-app.include_router(pages.router)
-app.include_router(correspondents.router, prefix="/api")
-app.include_router(document_types.router, prefix="/api")
-app.include_router(tags.router, prefix="/api")
-app.include_router(documents.router, prefix="/api")
-app.include_router(notifications.router, prefix="/api")
-app.include_router(backup.router, prefix="/api")
-
-
-@app.on_event("startup")
-async def auto_backup() -> None:
+async def _auto_backup() -> None:
     backup_dir = Path(settings.backup_path)
     existing = sorted(backup_dir.glob("procompta_backup_*.zip"))
     if existing:
@@ -60,8 +40,7 @@ async def auto_backup() -> None:
         logger.exception("Échec du backup automatique au démarrage")
 
 
-@app.on_event("startup")
-async def create_admin_user() -> None:
+async def _create_admin_user() -> None:
     async with async_session_factory() as session:
         existing = await session.scalar(select(User))
         if existing is None:
@@ -73,8 +52,7 @@ async def create_admin_user() -> None:
             await session.commit()
 
 
-@app.on_event("startup")
-async def seed_defaults() -> None:
+async def _seed_defaults() -> None:
     async with async_session_factory() as session:
         if not await session.scalar(select(DocumentType)):
             session.add_all([
@@ -100,6 +78,17 @@ async def seed_defaults() -> None:
                 Tag(name="Important",   slug="important",   color="#6366f1"),
             ])
         await session.commit()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await _create_admin_user()
+    await _seed_defaults()
+    await _auto_backup()
+    yield
+
+
+app = FastAPI(title="ProCompta", version="0.1.0", lifespan=lifespan)
 
 
 _ERROR_MESSAGES = {
