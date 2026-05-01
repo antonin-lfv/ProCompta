@@ -239,6 +239,35 @@ async def list_years(session: AsyncSession = Depends(get_session)) -> list[int]:
     return [int(row.year) for row in result.all()]
 
 
+@router.post("/detect", status_code=200)
+async def detect_fields_preview(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Extract text and detect correspondent/type without creating a document."""
+    mime = file.content_type or ""
+    if mime not in ALLOWED_MIME_TYPES:
+        return {"correspondent_id": None, "document_type_id": None}
+    content = await file.read()
+    if not content:
+        return {"correspondent_id": None, "document_type_id": None}
+    _EXT = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=_EXT.get(mime, ""), delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        text = await asyncio.to_thread(_extract_document_text, tmp_path, mime)
+        detected = await _auto_detect_fields(text, session) if text.strip() else {}
+    finally:
+        if tmp_path:
+            Path(tmp_path).unlink(missing_ok=True)
+    return {
+        "correspondent_id": str(detected["correspondent_id"]) if "correspondent_id" in detected else None,
+        "document_type_id": str(detected["document_type_id"]) if "document_type_id" in detected else None,
+    }
+
+
 @router.get("/upload")
 async def upload_get_not_allowed() -> None:
     raise HTTPException(status_code=405, detail="Use POST /upload to upload a file")

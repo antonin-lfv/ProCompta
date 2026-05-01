@@ -187,6 +187,23 @@ function yearData() {
       this.resetImgZoom();
       this._resetApplied();
       this.batchModal = true;
+      this._detectItems();
+    },
+    _detectItems() {
+      _rawFiles.forEach((file, idx) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        fetch('/api/documents/detect', { method: 'POST', body: fd })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (!data) return;
+            const item = this.batchFiles[idx];
+            if (!item) return;
+            if (!item.correspondent_id && data.correspondent_id) item.correspondent_id = data.correspondent_id;
+            if (!item.document_type_id && data.document_type_id) item.document_type_id = data.document_type_id;
+          })
+          .catch(() => null);
+      });
     },
     autoCalcTax() {
       const item = this.batchFiles[this.batchIdx];
