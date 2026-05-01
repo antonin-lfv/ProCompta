@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.3.8] - 2026-05-01
+
+### Ajouté
+- **Prorata déductible** - champ `prorata_pct` (%) sur les dépenses uniquement : saisie dans le formulaire d'édition (section "Prorata déductible", visible seulement pour les dépenses), facteur appliqué dans tous les calculs (dashboard, vue année, page années, bilans, rapports TVA, top correspondants, exports CSV) ; indicateur `~X%` dans les tableaux de la vue année ; sans prorata = 100% déductible (NULL en base)
+- **Pagination vue année** - maximum 5 documents par section (Dépenses / Recettes / Autres / Archivés), contrôles Précédent / Suivant par section sans rechargement serveur (Alpine.js `x-show`)
+- **Bouton "Tout voir"** par section - affiche tous les documents d'une catégorie sans limite, avec retour vers la vue paginée (paramètre `?category=`)
+- **TVA par défaut à 20%** - champ Taux TVA pré-rempli à 20 à l'ouverture du formulaire d'édition et lors de l'import (single et batch), quelle que soit la catégorie initiale
+
+### Modifié
+- **Retour contextuel depuis l'édition** - le paramètre `?back=` encode désormais l'URL complète (filtres + catégorie + tri + ordre), Sauvegarder et Annuler ramènent exactement à la même vue filtrée
+- **Tri en mode "Tout voir"** - les liens de tri préservent le paramètre `?category=` (plus de retour en vue paginée au clic)
+- **Filtres en mode "Tout voir"** - le formulaire de filtres inclut un `<input type="hidden" name="category">` pour rester en mode "Tout voir" après application des filtres
+- **Conversion devise sur changement de date de paiement** - la conversion BCE est re-déclenchée automatiquement dès que la date de paiement change (si devise ≠ EUR)
+- **Page de recherche `/documents`** - mise en page flex avec dates en largeur fixe (`w-36`) et champs montant en `flex-1`, le bouton Réinitialiser ne compresse plus "Montant max"
+
+### Corrigé
+- **Écart visuel** - espacement équilibré (`gap-3`) entre le bouton calcul TVA et le champ Montant TVA, cohérent avec l'écart Montant TVA → Montant TTC
+
+### Technique
+- Colonne `prorata_pct NUMERIC(5,2) NULL` sur `documents` (migration `20260501_0009`)
+- Valeur enum `prorata_changed` ajoutée à `activityeventenum` (migration `20260501_0010`, `ALTER TYPE … ADD VALUE IF NOT EXISTS`)
+- Expression SQLAlchemy `_prorata_dep = case((depense & prorata_pct IS NOT NULL, prorata_pct/100), else_=1)` définie au niveau module, multipliée sur `_eur_amount`, `amount_ht` et `vat_amount` dans toutes les requêtes de dépenses
+- Fonction Python `_eur(doc)` dans `year_view` proratise le montant pour les dépenses avec `prorata_pct` non nul
+- Historique d'activité : `old_prorata` capturé avant commit, entrée `prorata_changed` avec ancien/nouveau % si modifié
+- Colonne "Prorata (%)" ajoutée à l'export CSV documents
+
+---
+
 ## [1.3.0] - 2026-04-27
 
 ### Ajouté

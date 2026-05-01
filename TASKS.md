@@ -1,6 +1,6 @@
 # ProCompta - Suivi des tâches
 
-## Version courante : `v1.3.0` ✅ - Prochaine : `v1.4.0`
+## Version courante : `v1.3.8` ✅ - Prochaine : `v1.4.0`
 
 ---
 
@@ -256,6 +256,34 @@
 - [x] **[V13-3]** Ligne de total annuel en bas du tableau
 - [x] **[V13-4]** Export CSV de ce tableau TVA (`GET /reports/export/tva?year=`, bouton dédié)
 - [x] **[V13-5]** Filtre par année partagé avec les autres sections de la page Rapports
+
+---
+
+### ✅ Terminé - v1.3.8
+
+> Objectif : ergonomie de navigation, qualité des saisies et comptabilité partielle (prorata).
+
+#### Vue année - pagination et navigation
+- [x] **[V138-1]** Pagination par section (max 5 docs) - contrôles Précédent / Suivant, état par section dans Alpine.js, sans rechargement serveur
+- [x] **[V138-2]** Bouton "Tout voir" par section - paramètre `?category=`, titre de page contextuel, bouton "← Retour"
+- [x] **[V138-3]** Tri préservé en mode "Tout voir" - `sort_base_url` inclut `?category=`
+- [x] **[V138-4]** Filtres préservés en mode "Tout voir" - `<input type="hidden" name="category">` dans le formulaire de filtres
+- [x] **[V138-5]** Retour contextuel exact depuis l'édition - `?back=` encode URL complète (filtres + catégorie + tri + ordre)
+
+#### Import et saisie
+- [x] **[V138-6]** TVA par défaut à 20% - pré-rempli dans le formulaire d'édition et dans la modale batch (single et multi)
+- [x] **[V138-7]** Correction gap visuel - espacement équilibré entre bouton calcul TVA et champ Montant TVA
+- [x] **[V138-8]** Conversion devise re-déclenchée au changement de date de paiement (si devise ≠ EUR)
+- [x] **[V138-9]** Page de recherche `/documents` - mise en page flex, dates en largeur fixe, champ "Montant max" non compressé
+
+#### Prorata déductible
+- [x] **[V138-10]** Champ `prorata_pct` (Numeric 5,2, nullable) sur les documents - migration `20260501_0009`
+- [x] **[V138-11]** UI dans le formulaire d'édition - section "Prorata déductible" visible seulement pour les dépenses, alerte amber si < 100%
+- [x] **[V138-12]** Indicateur `~X%` dans les tableaux de la vue année sur les lignes avec prorata
+- [x] **[V138-13]** Facteur prorata dans tous les calculs SQL : dashboard (dépenses, TVA déductible, N-1, mensuel, types, top correspondants), page années, bilans, rapports TVA, exports CSV
+- [x] **[V138-14]** Facteur prorata dans les totaux Python de la vue année (`_eur()`)
+- [x] **[V138-15]** Historique d'activité - événement `prorata_changed` (migration `20260501_0010`), ancien et nouveau %, icône + label "Prorata modifié"
+- [x] **[V138-16]** Export CSV documents - colonne "Prorata (%)" ajoutée
 
 ---
 
