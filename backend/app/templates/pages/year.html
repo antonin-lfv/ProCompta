@@ -61,6 +61,11 @@ function yearData() {
   return {
     showFilters: {{ 'true' if has_filters else 'false' }},
     dragOver: false,
+    sections: { depenses: 1, recettes: 1, autres: 1, archived: 1 },
+    rowVisible(section, idx) {
+      const p = this.sections[section] || 1;
+      return idx >= (p - 1) * 5 && idx < p * 5;
+    },
 
     // Single file upload
     uploading: false,
@@ -345,7 +350,7 @@ function yearData() {
       return this.selectedIds.includes(id);
     },
     toggleSelectAll(tableEl) {
-      const ids = Array.from(tableEl.querySelectorAll('tbody tr')).map(r => r.id.replace('doc-', ''));
+      const ids = Array.from(tableEl.querySelectorAll('tbody tr')).filter(r => r.style.display !== 'none').map(r => r.id.replace('doc-', ''));
       const allSelected = ids.length > 0 && ids.every(id => this.selectedIds.includes(id));
       if (allSelected) {
         this.selectedIds = this.selectedIds.filter(x => !ids.includes(x));
@@ -356,7 +361,7 @@ function yearData() {
       this._notifyBulk();
     },
     areAllSelected(tableEl) {
-      const rows = Array.from(tableEl?.querySelectorAll('tbody tr') || []);
+      const rows = Array.from(tableEl?.querySelectorAll('tbody tr') || []).filter(r => r.style.display !== 'none');
       if (!rows.length) return false;
       return rows.every(r => this.selectedIds.includes(r.id.replace('doc-', '')));
     },
@@ -591,7 +596,8 @@ function yearData() {
     </div>
   {% endif %}
 
-  {% macro doc_table(docs, back_year, sort, order, sort_base_url) %}
+  {% macro doc_table(docs, back_year, sort, order, sort_base_url, section='') %}
+  {%- set total_pages = [((docs|length - 1) // 5 + 1), 1]|max -%}
   <div class="overflow-x-auto">
   <table class="w-full text-sm table-fixed min-w-[840px]">
     <colgroup>
@@ -625,6 +631,7 @@ function yearData() {
       {% for doc in docs %}
       <tr class="hover:bg-slate-50 transition-colors group cursor-pointer" id="doc-{{ doc.id }}"
           data-amount="{{ doc.amount_ttc_eur if (doc.currency != 'EUR' and doc.amount_ttc_eur) else (doc.amount_ttc or 0) }}"
+          x-show="rowVisible('{{ section }}', {{ loop.index0 }})"
           :class="isSelected('{{ doc.id }}') ? 'bg-indigo-50/60' : ''"
           @click="if(!$event.target.closest('button, a, input')) window.location.href='/documents/{{ doc.id }}/edit'">
         <td class="px-3 py-3" @click.stop>
@@ -706,6 +713,29 @@ function yearData() {
     </tbody>
   </table>
   </div>
+  {% if docs|length > 5 %}
+  <div class="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 bg-slate-50/40">
+    <button
+      @click="sections['{{ section }}'] = Math.max(1, sections['{{ section }}'] - 1)"
+      :disabled="sections['{{ section }}'] === 1"
+      :class="sections['{{ section }}'] === 1 ? 'opacity-30 cursor-not-allowed' : 'hover:text-indigo-600 hover:bg-indigo-50'"
+      class="flex items-center gap-1 text-xs text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200 bg-white transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+      Précédent
+    </button>
+    <span class="text-xs text-slate-400">
+      Page <span x-text="sections['{{ section }}']" class="font-medium text-slate-600"></span> / {{ total_pages }}
+    </span>
+    <button
+      @click="sections['{{ section }}'] = Math.min({{ total_pages }}, sections['{{ section }}'] + 1)"
+      :disabled="sections['{{ section }}'] === {{ total_pages }}"
+      :class="sections['{{ section }}'] === {{ total_pages }} ? 'opacity-30 cursor-not-allowed' : 'hover:text-indigo-600 hover:bg-indigo-50'"
+      class="flex items-center gap-1 text-xs text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200 bg-white transition-colors">
+      Suivant
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+    </button>
+  </div>
+  {% endif %}
   {% endmacro %}
 
   <!-- Dépenses -->
@@ -719,7 +749,7 @@ function yearData() {
       </span>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      {{ doc_table(docs_depenses, year, sort, order, sort_base_url) }}
+      {{ doc_table(docs_depenses, year, sort, order, sort_base_url, 'depenses') }}
     </div>
   </div>
   {% endif %}
@@ -735,7 +765,7 @@ function yearData() {
       </span>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      {{ doc_table(docs_recettes, year, sort, order, sort_base_url) }}
+      {{ doc_table(docs_recettes, year, sort, order, sort_base_url, 'recettes') }}
     </div>
   </div>
   {% endif %}
@@ -750,7 +780,7 @@ function yearData() {
       </span>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      {{ doc_table(docs_autres, year, sort, order, sort_base_url) }}
+      {{ doc_table(docs_autres, year, sort, order, sort_base_url, 'autres') }}
     </div>
   </div>
   {% endif %}
@@ -770,7 +800,7 @@ function yearData() {
       </span>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden opacity-60 hover:opacity-100 transition-opacity">
-      {{ doc_table(docs_archived, year, sort, order, sort_base_url) }}
+      {{ doc_table(docs_archived, year, sort, order, sort_base_url, 'archived') }}
     </div>
   </div>
   {% endif %}

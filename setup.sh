@@ -12,7 +12,7 @@ die()     { echo -e "${RED}✗${NC}  $*" >&2; exit 1; }
 
 trap '
   code=$?
-  [ $code -ne 0 ] && echo -e "\n${YELLOW}⚠${NC}  Une erreur est survenue. Pas besoin de relancer ${BOLD}git clone${NC} — corrigez le problème puis relancez simplement : ${BOLD}./setup.sh${NC}"
+  [ $code -ne 0 ] && echo -e "\n${YELLOW}⚠${NC}  Une erreur est survenue. Pas besoin de relancer ${BOLD}git clone${NC} - corrigez le problème puis relancez simplement : ${BOLD}./setup.sh${NC}"
 ' EXIT
 
 echo ""
