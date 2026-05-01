@@ -529,6 +529,7 @@ function yearData() {
        x-transition:leave-end="opacity-0 -translate-y-2">
     <form method="GET" action="/year/{{ year }}"
           class="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {% if show_category %}<input type="hidden" name="category" value="{{ show_category }}">{% endif %}
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Correspondant</label>
         <select name="correspondent_id"
