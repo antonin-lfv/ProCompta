@@ -678,6 +678,9 @@ function yearData() {
           {% else %}
             <span class="text-slate-400">-</span>
           {% endif %}
+          {% if doc.prorata_pct is not none %}
+            <span class="text-xs font-normal text-amber-600 block">~{{ doc.prorata_pct | int }}%</span>
+          {% endif %}
         </td>
         <td class="px-2 py-3">
           <div class="flex items-center justify-end gap-1">

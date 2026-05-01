@@ -20,6 +20,7 @@ class ActivityEventEnum(str, enum.Enum):
     amount_changed = "amount_changed"
     date_changed = "date_changed"
     notes_changed = "notes_changed"
+    prorata_changed = "prorata_changed"
     archived = "archived"
     unarchived = "unarchived"
 

@@ -95,6 +95,15 @@ _eur_amount = case(
     else_=Document.amount_ttc_eur,
 )
 
+# Facteur prorata pour les dépenses (1 si NULL ou non-dépense)
+_prorata_dep = case(
+    (
+        (Document.category == CategoryEnum.depense) & Document.prorata_pct.isnot(None),
+        Document.prorata_pct / 100,
+    ),
+    else_=1,
+)
+
 _filing_date = func.coalesce(Document.payment_date, Document.document_date)
 
 _CAT_LABELS = {"depense": "Dépenses", "recette": "Recettes", "autre": "Autres"}
@@ -191,7 +200,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
     ]
 
     total_depenses = (await session.scalar(
-        select(func.sum(_eur_amount)).where(*_year_filter, Document.category == CategoryEnum.depense)
+        select(func.sum(_eur_amount * _prorata_dep)).where(*_year_filter, Document.category == CategoryEnum.depense)
     )) or Decimal("0")
     total_recettes = (await session.scalar(
         select(func.sum(_eur_amount)).where(*_year_filter, Document.category == CategoryEnum.recette)
@@ -200,7 +209,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
 
     # TVA
     tva_deductible = (await session.scalar(
-        select(func.sum(Document.vat_amount)).where(*_year_filter, Document.category == CategoryEnum.depense)
+        select(func.sum(Document.vat_amount * _prorata_dep)).where(*_year_filter, Document.category == CategoryEnum.depense)
     )) or Decimal("0")
     tva_collectee = (await session.scalar(
         select(func.sum(Document.vat_amount)).where(*_year_filter, Document.category == CategoryEnum.recette)
@@ -208,7 +217,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
 
     # N-1
     prev_depenses = (await session.scalar(
-        select(func.sum(_eur_amount)).where(*_prev_year_filter, Document.category == CategoryEnum.depense)
+        select(func.sum(_eur_amount * _prorata_dep)).where(*_prev_year_filter, Document.category == CategoryEnum.depense)
     )) or Decimal("0")
     prev_recettes = (await session.scalar(
         select(func.sum(_eur_amount)).where(*_prev_year_filter, Document.category == CategoryEnum.recette)
@@ -219,7 +228,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
     monthly_result = await session.execute(
         select(
             extract("month", _filing_date).label("month"),
-            func.coalesce(func.sum(_eur_amount).filter(Document.category == CategoryEnum.depense), 0).label("depenses"),
+            func.coalesce(func.sum((_eur_amount * _prorata_dep)).filter(Document.category == CategoryEnum.depense), 0).label("depenses"),
             func.coalesce(func.sum(_eur_amount).filter(Document.category == CategoryEnum.recette), 0).label("recettes"),
         )
         .where(*_year_filter)
@@ -235,12 +244,12 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         select(
             DocumentType.name,
             DocumentType.color,
-            func.coalesce(func.sum(_eur_amount), 0).label("total"),
+            func.coalesce(func.sum(_eur_amount * _prorata_dep), 0).label("total"),
         )
         .join(Document, Document.document_type_id == DocumentType.id)
         .where(*_year_filter, Document.category == CategoryEnum.depense)
         .group_by(DocumentType.id, DocumentType.name, DocumentType.color)
-        .order_by(func.sum(_eur_amount).desc())
+        .order_by(func.sum(_eur_amount * _prorata_dep).desc())
     )
     type_depenses = [
         {"name": r.name, "color": r.color or "#6366f1", "total": float(r.total)}
@@ -251,12 +260,12 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
     top_corr_result = await session.execute(
         select(
             Correspondent.name,
-            func.coalesce(func.sum(_eur_amount), 0).label("total"),
+            func.coalesce(func.sum(_eur_amount * _prorata_dep), 0).label("total"),
         )
         .join(Document, Document.correspondent_id == Correspondent.id)
         .where(*_year_filter, Document.category == CategoryEnum.depense)
         .group_by(Correspondent.id, Correspondent.name)
-        .order_by(func.sum(_eur_amount).desc())
+        .order_by(func.sum(_eur_amount * _prorata_dep).desc())
         .limit(5)
     )
     top_correspondants = [
@@ -307,7 +316,7 @@ async def years_list(request: Request, session: AsyncSession = Depends(get_sessi
                 0,
             ).label("total_recettes"),
             func.coalesce(
-                func.sum(_eur_amount).filter(Document.category == CategoryEnum.depense),
+                func.sum(_eur_amount * _prorata_dep).filter(Document.category == CategoryEnum.depense),
                 0,
             ).label("total_depenses"),
         )
@@ -411,7 +420,10 @@ async def year_view(
     docs_archived = list((await session.execute(archived_stmt)).scalars().all())
 
     def _eur(d: Document) -> Decimal:
-        return (d.amount_ttc if d.currency == "EUR" else d.amount_ttc_eur) or Decimal("0")
+        base = (d.amount_ttc if d.currency == "EUR" else d.amount_ttc_eur) or Decimal("0")
+        if d.category == CategoryEnum.depense and d.prorata_pct is not None:
+            return (base * d.prorata_pct / 100).quantize(Decimal("0.01"))
+        return base
 
     total_depenses = sum((_eur(d) for d in docs_depenses), Decimal("0"))
     total_recettes = sum((_eur(d) for d in docs_recettes), Decimal("0"))
@@ -628,6 +640,7 @@ async def document_update_form(
     old_date = doc.document_date.isoformat() if doc.document_date else None
     old_payment_date = doc.payment_date
     old_notes = doc.notes
+    old_prorata = doc.prorata_pct
 
     if title := str(form.get("title", "")).strip():
         doc.title = title
@@ -639,10 +652,12 @@ async def document_update_form(
         doc.category = CategoryEnum(cat_val)
 
     is_autre = doc.category == CategoryEnum.autre
+    is_depense = doc.category == CategoryEnum.depense
     doc.payment_date = None if is_autre else _date(str(form.get("payment_date", "")))
     doc.amount_ht = None if is_autre else _decimal(str(form.get("amount_ht", "")))
     doc.vat_amount = None if is_autre else _decimal(str(form.get("vat_amount", "")))
     doc.vat_rate = None if is_autre else _decimal(str(form.get("vat_rate", "")))
+    doc.prorata_pct = _decimal(str(form.get("prorata_pct", ""))) if is_depense else None
     doc.amount_ttc = None if is_autre else _decimal(str(form.get("amount_ttc", "")))
     doc.currency = str(form.get("currency", "EUR")).strip() or "EUR"
     doc.amount_ttc_eur = None if (is_autre or doc.currency == "EUR") else _decimal(str(form.get("amount_ttc_eur", "")))
@@ -680,6 +695,13 @@ async def document_update_form(
         activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.date_changed, old_value=old_date, new_value=new_date))
     if doc.notes != old_notes:
         activities.append(DocumentActivity(document_id=doc.id, event_type=ActivityEventEnum.notes_changed))
+    if doc.prorata_pct != old_prorata:
+        activities.append(DocumentActivity(
+            document_id=doc.id,
+            event_type=ActivityEventEnum.prorata_changed,
+            old_value=str(old_prorata) if old_prorata is not None else None,
+            new_value=str(doc.prorata_pct) if doc.prorata_pct is not None else None,
+        ))
     if activities:
         for a in activities:
             session.add(a)
@@ -749,9 +771,9 @@ async def reports(
             Document.category,
             DocumentType.name.label("type_name"),
             func.count(Document.id).label("count"),
-            func.coalesce(func.sum(Document.amount_ht), 0).label("total_ht"),
-            func.coalesce(func.sum(Document.vat_amount), 0).label("total_tva"),
-            func.coalesce(func.sum(_eur_amount), 0).label("total_ttc"),
+            func.coalesce(func.sum(Document.amount_ht * _prorata_dep), 0).label("total_ht"),
+            func.coalesce(func.sum(Document.vat_amount * _prorata_dep), 0).label("total_tva"),
+            func.coalesce(func.sum(_eur_amount * _prorata_dep), 0).label("total_ttc"),
         )
         .outerjoin(DocumentType, Document.document_type_id == DocumentType.id)
         .where(*_base)
@@ -777,9 +799,9 @@ async def reports(
             Correspondent.name.label("corr_name"),
             Document.category,
             func.count(Document.id).label("count"),
-            func.coalesce(func.sum(Document.amount_ht), 0).label("total_ht"),
-            func.coalesce(func.sum(Document.vat_amount), 0).label("total_tva"),
-            func.coalesce(func.sum(_eur_amount), 0).label("total_ttc"),
+            func.coalesce(func.sum(Document.amount_ht * _prorata_dep), 0).label("total_ht"),
+            func.coalesce(func.sum(Document.vat_amount * _prorata_dep), 0).label("total_tva"),
+            func.coalesce(func.sum(_eur_amount * _prorata_dep), 0).label("total_ttc"),
         )
         .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
         .where(*_base)
@@ -811,8 +833,8 @@ async def reports(
     tva_q_result = await session.execute(
         select(
             extract("quarter", _filing_date).label("q"),
-            func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.depense), 0).label("base_ht_dep"),
-            func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.depense), 0).label("tva_ded"),
+            func.coalesce(func.sum((Document.amount_ht * _prorata_dep)).filter(Document.category == CategoryEnum.depense), 0).label("base_ht_dep"),
+            func.coalesce(func.sum((Document.vat_amount * _prorata_dep)).filter(Document.category == CategoryEnum.depense), 0).label("tva_ded"),
             func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.recette), 0).label("base_ht_rec"),
             func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.recette), 0).label("tva_col"),
         )
@@ -880,7 +902,7 @@ async def export_documents_csv(
     suffix = f"_T{quarter}" if quarter else ""
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
-    writer.writerow(["Titre", "Date", "Date paiement", "Catégorie", "Correspondant", "Type", "Tags", "Devise", "HT", "TVA", "TTC", "TTC EUR", "Notes"])
+    writer.writerow(["Titre", "Date", "Date paiement", "Catégorie", "Correspondant", "Type", "Tags", "Devise", "HT", "TVA", "TTC", "TTC EUR", "Prorata (%)", "Notes"])
     for doc in docs:
         writer.writerow([
             doc.title,
@@ -895,6 +917,7 @@ async def export_documents_csv(
             str(doc.vat_amount or ""),
             str(doc.amount_ttc or ""),
             str(doc.amount_ttc_eur or ""),
+            str(doc.prorata_pct or ""),
             doc.notes or "",
         ])
     content = "﻿" + output.getvalue()
@@ -921,9 +944,9 @@ async def export_bilan_csv(
             DocumentType.name.label("type_name"),
             Correspondent.name.label("corr_name"),
             func.count(Document.id).label("count"),
-            func.coalesce(func.sum(Document.amount_ht), 0).label("total_ht"),
-            func.coalesce(func.sum(Document.vat_amount), 0).label("total_tva"),
-            func.coalesce(func.sum(_eur_amount), 0).label("total_ttc"),
+            func.coalesce(func.sum(Document.amount_ht * _prorata_dep), 0).label("total_ht"),
+            func.coalesce(func.sum(Document.vat_amount * _prorata_dep), 0).label("total_tva"),
+            func.coalesce(func.sum(_eur_amount * _prorata_dep), 0).label("total_ttc"),
         )
         .outerjoin(DocumentType, Document.document_type_id == DocumentType.id)
         .outerjoin(Correspondent, Document.correspondent_id == Correspondent.id)
@@ -964,8 +987,8 @@ async def export_tva_csv(
     tva_q_result = await session.execute(
         select(
             extract("quarter", _filing_date).label("q"),
-            func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.depense), 0).label("base_ht_dep"),
-            func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.depense), 0).label("tva_ded"),
+            func.coalesce(func.sum((Document.amount_ht * _prorata_dep)).filter(Document.category == CategoryEnum.depense), 0).label("base_ht_dep"),
+            func.coalesce(func.sum((Document.vat_amount * _prorata_dep)).filter(Document.category == CategoryEnum.depense), 0).label("tva_ded"),
             func.coalesce(func.sum(Document.amount_ht).filter(Document.category == CategoryEnum.recette), 0).label("base_ht_rec"),
             func.coalesce(func.sum(Document.vat_amount).filter(Document.category == CategoryEnum.recette), 0).label("tva_col"),
         )
