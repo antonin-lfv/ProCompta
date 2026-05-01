@@ -21,6 +21,9 @@ function docEditData() {
         this.amountEur = '';
         if (val !== 'EUR') this.fetchConversion();
       });
+      this.$watch('payDate', () => {
+        if (this.currency !== 'EUR') this.fetchConversion();
+      });
       this.$watch('category', (val) => {
         if (val === 'autre') {
           this.payDate = '';
@@ -55,7 +58,7 @@ function docEditData() {
         const resp = await fetch('/api/documents/{{ doc.id }}/convert-currency', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ currency: this.currency, amount }),
+          body: JSON.stringify({ currency: this.currency, amount, payment_date: this.payDate || null }),
         });
         if (resp.ok) {
           const data = await resp.json();

@@ -35,6 +35,7 @@ class BulkActionRequest(BaseModel):
 class ConvertRequest(BaseModel):
     currency: str
     amount: Decimal
+    payment_date: str | None = None  # ISO date, prioritaire sur doc.payment_date
 
 
 class GenericConvertRequest(BaseModel):
@@ -492,7 +493,13 @@ async def convert_currency(
         raise HTTPException(status_code=404, detail="Document not found")
 
     today = date.today()
-    rate_date = min(doc.payment_date or doc.document_date, today)
+    _override = None
+    if body.payment_date:
+        try:
+            _override = date.fromisoformat(body.payment_date)
+        except ValueError:
+            pass
+    rate_date = min(_override or doc.payment_date or doc.document_date, today)
     try:
         rate = await _fetch_ecb_rate(body.currency, rate_date)
         if rate is None:

@@ -436,6 +436,10 @@ async def year_view(
     _sep = "&" if _base_qs else "?"
     _view_all_urls = {cat: f"{_back_url}{_sep}category={cat}" for cat in ("depenses", "recettes", "autres", "archived")}
     _sort_params = _filter_params + ([("category", category)] if category else [])
+    _return_params = _sort_params + [("sort", sort), ("order", order)]
+    _return_qs = urlencode([(k, v) for k, v in _return_params if v])
+    _return_url = f"{_year_path}?{_return_qs}" if _return_qs else _year_path
+    _return_url_encoded = quote(_return_url, safe="")
 
     return render(request, "pages/year.html", {
         "year": year,
@@ -467,6 +471,7 @@ async def year_view(
         "show_category": category,
         "back_url": _back_url,
         "view_all_urls": _view_all_urls,
+        "return_url_encoded": _return_url_encoded,
     })
 
 
