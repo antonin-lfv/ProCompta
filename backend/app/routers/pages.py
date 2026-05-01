@@ -334,8 +334,12 @@ async def year_view(
     amount_max: str | None = Query(default=None),
     sort: str = Query(default="date"),
     order: str = Query(default="desc"),
+    category: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> HTMLResponse:
+    _VALID_CATEGORIES = {"depenses", "recettes", "autres", "archived"}
+    if category not in _VALID_CATEGORIES:
+        category = None
     corr_uuid = _uuid(correspondent_id)
     dtype_uuid = _uuid(document_type_id)
     tag_uuids = [u for s in tag_ids if (u := _uuid(s))]
@@ -426,6 +430,12 @@ async def year_view(
         *[("tag_ids", str(t)) for t in tag_uuids],
     ]
 
+    _base_qs = urlencode([(k, v) for k, v in _filter_params if v])
+    _year_path = f"/year/{year}"
+    _back_url = f"{_year_path}?{_base_qs}" if _base_qs else _year_path
+    _sep = "&" if _base_qs else "?"
+    _view_all_urls = {cat: f"{_back_url}{_sep}category={cat}" for cat in ("depenses", "recettes", "autres", "archived")}
+
     return render(request, "pages/year.html", {
         "year": year,
         "documents": docs,
@@ -453,6 +463,9 @@ async def year_view(
         "sort": sort,
         "order": order,
         "sort_base_url": _sort_base_url(f"/year/{year}", _filter_params),
+        "show_category": category,
+        "back_url": _back_url,
+        "view_all_urls": _view_all_urls,
     })
 
 
