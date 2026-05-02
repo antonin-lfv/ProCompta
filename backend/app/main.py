@@ -89,7 +89,6 @@ async def _reminder_loop() -> None:
     from app.routers.reminders import _fire_reminder
 
     while True:
-        await asyncio.sleep(24 * 3600)
         try:
             async with async_session_factory() as session:
                 today = date.today()
@@ -103,6 +102,7 @@ async def _reminder_loop() -> None:
                     await _fire_reminder(reminder, session)
         except Exception:
             logger.exception("Erreur dans la boucle de rappels")
+        await asyncio.sleep(24 * 3600)
 
 
 @asynccontextmanager

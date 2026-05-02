@@ -1,4 +1,5 @@
 import asyncio
+import html as html_mod
 import logging
 import uuid
 from datetime import date, datetime, timezone
@@ -6,7 +7,7 @@ from datetime import date, datetime, timezone
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +21,7 @@ router = APIRouter(tags=["reminders"])
 class ReminderCreate(BaseModel):
     name: str
     description: str | None = None
-    frequency_days: int
+    frequency_days: int = Field(gt=0)
     next_due_date: date
     notify_email: bool = True
     notify_inapp: bool = True
@@ -30,7 +31,7 @@ class ReminderCreate(BaseModel):
 class ReminderUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
-    frequency_days: int | None = None
+    frequency_days: int | None = Field(None, gt=0)
     next_due_date: date | None = None
     notify_email: bool | None = None
     notify_inapp: bool | None = None
@@ -114,17 +115,19 @@ async def _fire_reminder(reminder: Reminder, session: AsyncSession, advance: boo
         session.add(notif)
 
     if reminder.notify_email and settings.smtp_configured:
-        user = await session.scalar(select(User))
+        user = await session.scalar(select(User).order_by(User.created_at))
         to_email = user.email if user else None
         if not to_email:
             logger.warning("Reminder email skipped: no user found in database")
         elif not to_email.lower().endswith("@gmail.com") and settings.smtp_host == "smtp.gmail.com":
             logger.warning("Reminder email skipped: %s is not a Gmail address (smtp_host=smtp.gmail.com)", to_email)
         else:
+            safe_name = html_mod.escape(reminder.name)
+            safe_desc = f"<p>{html_mod.escape(reminder.description)}</p>" if reminder.description else ""
             body_html = f"""
             <p>Bonjour,</p>
-            <p>Rappel ProCompta : <strong>{reminder.name}</strong></p>
-            {"<p>" + reminder.description + "</p>" if reminder.description else ""}
+            <p>Rappel ProCompta : <strong>{safe_name}</strong></p>
+            {safe_desc}
             <p>Échéance prévue : {reminder.next_due_date.isoformat()}</p>
             """
             await asyncio.to_thread(send_reminder_email, f"[ProCompta] Rappel : {reminder.name}", body_html, to_email)

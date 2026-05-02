@@ -1,6 +1,6 @@
 import base64
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
 
 from google.auth.transport.requests import Request
@@ -66,7 +66,7 @@ def fetch_invoices(
 
     q_parts = [f"from:{sender}", "has:attachment"]
     if subject_contains:
-        q_parts.append(f'subject:"{subject_contains}"')
+        q_parts.append(f'subject:"{subject_contains.replace(chr(34), "")}"')
     if after_date:
         q_parts.append(f"after:{after_date.strftime('%Y/%m/%d')}")
     if before_date:
@@ -75,6 +75,7 @@ def fetch_invoices(
 
     messages: list[dict] = []
     page_token = None
+    pages = 0
     while True:
         kwargs: dict = {"userId": "me", "q": q, "maxResults": 500}
         if page_token:
@@ -82,7 +83,8 @@ def fetch_invoices(
         response = service.users().messages().list(**kwargs).execute()
         messages.extend(response.get("messages", []))
         page_token = response.get("nextPageToken")
-        if not page_token:
+        pages += 1
+        if not page_token or pages >= 20:
             break
 
     results = []
@@ -103,7 +105,7 @@ def fetch_invoices(
         try:
             email_date = parsedate_to_datetime(date_str)
         except Exception:
-            email_date = datetime.now()
+            email_date = datetime.now(timezone.utc)
 
         for part in _iter_parts(msg["payload"]):
             filename = part.get("filename", "")
