@@ -5,7 +5,7 @@
 <h4 align="center">Gestionnaire de documents comptables · local · sans abonnement · sans cloud.</h4>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.3.8-green.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.5.1-green.svg" alt="Version">
   <img src="https://img.shields.io/badge/Python-3.13+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/PostgreSQL-16-orange.svg" alt="PostgreSQL">
   <img src="https://img.shields.io/badge/Docker-ready-2496ED.svg" alt="Docker">
@@ -148,6 +148,15 @@ Le script fait tout automatiquement :
   <br clear="all"/>
 </p>
 
+<br>
+
+<p align="left">
+  <strong>🤖 Automatisations</strong>
+  <br><br>
+
+  La page Automatisations permet de connecter ProCompta à votre boîte Gmail via <strong>OAuth 2.0 PKCE</strong> pour récupérer automatiquement les factures reçues par e-mail. Configurez des <strong>sources Gmail</strong> (expéditeurs, mots-clés) et des <strong>rappels automatiques</strong> par e-mail (documents incomplets, échéances à venir). La récupération tourne en arrière-plan et journalise chaque import. La connexion Gmail se déconnecte automatiquement si vous changez d'adresse e-mail dans votre profil.
+</p>
+
 ---
 
 ## ⌨️ Raccourcis clavier
@@ -174,7 +183,9 @@ Le script fait tout automatiquement :
 | **Actions groupées** | Sélection multiple, archivage / désarchivage / suppression en lot |
 | **Exports** | CSV bilan comptable, CSV TVA trimestrielle, CSV liste des documents |
 | **Workflow** | Archivage, journal d'activité par document, notifications documents incomplets |
-| **Sécurité** | Authentification e-mail + mot de passe, session 30 jours (HMAC signé) |
+| **Gmail** | Connexion OAuth 2.0 PKCE, récupération automatique de factures depuis vos e-mails, sources paramétrables, journal d'import |
+| **Rappels** | Rappels automatiques par e-mail (documents incomplets, échéances), fréquence configurable |
+| **Sécurité** | Authentification e-mail + mot de passe, session 30 jours (HMAC signé), protection Zip Slip sur les restaurations |
 | **Backup** | Export ZIP (dump SQL + fichiers), restauration avec confirmation par mot de passe |
 | **Ergonomie** | Raccourcis clavier, tooltips, preview intégrée, responsive |
 
