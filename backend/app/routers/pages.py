@@ -26,6 +26,7 @@ from app.models.notification import Notification, NotificationTypeEnum
 from app.models.reminder import Reminder
 from app.models.document_type import DocumentType
 from app.models.tag import Tag
+from app.models.user import User
 from app.services.file_service import delete_file, rename_file
 from app.services.preview_service import delete_preview
 from app.templating import render, templates
@@ -1033,20 +1034,33 @@ async def automations(request: Request, session: AsyncSession = Depends(get_sess
     gmail_sources_result = await session.execute(select(GmailSource).order_by(GmailSource.name))
     reminders_result = await session.execute(select(Reminder).order_by(Reminder.next_due_date))
 
-    user_email: str = request.state.user.email
+    user = await session.get(User, request.state.user.id)  # fresh from DB
+    user_email: str = user.email
     user_email_is_gmail = user_email.lower().endswith("@gmail.com")
 
-    gmail_tag = await session.scalar(select(Tag).where(Tag.slug == "auto"))
+    gmail_has_credentials = bool(user.gmail_client_id and user.gmail_client_secret)
+    gmail_has_token = bool(user.gmail_refresh_token)
 
     gmail_account_email: str | None = None
     gmail_error: str | None = None
-    if user_email_is_gmail and settings.gmail_configured:
-        from app.services.gmail_service import check_connection
-        ok, result = await asyncio.to_thread(check_connection)
-        if ok:
-            gmail_account_email = result
-        else:
-            gmail_error = result
+    if user_email_is_gmail and gmail_has_token:
+        from app.services.gmail_service import check_connection, resolve_credentials
+        creds = resolve_credentials(user)
+        if creds:
+            ok, result = await asyncio.to_thread(check_connection, *creds)
+            if ok:
+                gmail_account_email = result
+            else:
+                gmail_error = result
+
+    # Compute redirect URI for wizard instructions
+    gmail_redirect_uri = f"http://localhost:{settings.api_port}/api/gmail/oauth/callback"
+
+    # OAuth success/error from callback redirect
+    oauth_success = request.query_params.get("oauth_success") == "1"
+    oauth_error = request.query_params.get("oauth_error")
+
+    gmail_tag = await session.scalar(select(Tag).where(Tag.slug == "auto"))
 
     return render(request, "pages/automations.html", {
         "gmail_sources": list(gmail_sources_result.scalars().all()),
@@ -1056,9 +1070,14 @@ async def automations(request: Request, session: AsyncSession = Depends(get_sess
         "today": date.today(),
         "admin_email": user_email,
         "admin_email_is_gmail": user_email_is_gmail,
-        "gmail_configured": settings.gmail_configured,
+        "gmail_has_credentials": gmail_has_credentials,
+        "gmail_has_token": gmail_has_token,
+        "gmail_configured": gmail_has_token,
         "gmail_account_email": gmail_account_email,
         "gmail_error": gmail_error,
+        "gmail_redirect_uri": gmail_redirect_uri,
+        "oauth_success": oauth_success,
+        "oauth_error": oauth_error,
         "smtp_configured": settings.smtp_configured,
         "gmail_tag_id": str(gmail_tag.id) if gmail_tag else None,
     })

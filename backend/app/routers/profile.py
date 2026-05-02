@@ -53,6 +53,12 @@ async def update_identity(
     if email:
         if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
             return RedirectResponse("/profile?error=invalid_email", status_code=303)
+        if email != user.email:
+            user.gmail_client_id = None
+            user.gmail_client_secret = None
+            user.gmail_refresh_token = None
+            user.gmail_oauth_state = None
+            user.gmail_code_verifier = None
         user.email = email
     await session.commit()
     return RedirectResponse("/profile?success=identity", status_code=303)

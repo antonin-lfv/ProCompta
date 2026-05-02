@@ -7,17 +7,23 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-from app.config import settings
-
 logger = logging.getLogger(__name__)
 
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
-def _build_service():
+
+def resolve_credentials(user=None) -> tuple[str, str, str] | None:
+    if user and user.gmail_client_id and user.gmail_client_secret and user.gmail_refresh_token:
+        return user.gmail_client_id, user.gmail_client_secret, user.gmail_refresh_token
+    return None
+
+
+def _build_service(client_id: str, client_secret: str, refresh_token: str):
     creds = Credentials(
         token=None,
-        refresh_token=settings.gmail_refresh_token,
-        client_id=settings.gmail_client_id,
-        client_secret=settings.gmail_client_secret,
+        refresh_token=refresh_token,
+        client_id=client_id,
+        client_secret=client_secret,
         token_uri="https://oauth2.googleapis.com/token",
     )
     try:
@@ -27,12 +33,10 @@ def _build_service():
     return build("gmail", "v1", credentials=creds)
 
 
-def check_connection() -> tuple[bool, str]:
+def check_connection(client_id: str, client_secret: str, refresh_token: str) -> tuple[bool, str]:
     """Returns (True, email) on success, (False, error_message) on failure."""
-    if not settings.gmail_configured:
-        return False, "Variables GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN manquantes dans .env"
     try:
-        service = _build_service()
+        service = _build_service(client_id, client_secret, refresh_token)
         profile = service.users().getProfile(userId="me").execute()
         return True, profile["emailAddress"]
     except Exception as exc:
@@ -48,6 +52,9 @@ def _iter_parts(payload: dict):
 
 
 def fetch_invoices(
+    client_id: str,
+    client_secret: str,
+    refresh_token: str,
     sender: str,
     subject_contains: str | None,
     attachment_name_contains: str | None,
@@ -55,17 +62,7 @@ def fetch_invoices(
     after_date: date | None = None,
     before_date: date | None = None,
 ) -> list[dict]:
-    """
-    Returns list of {
-        "message_id": str,
-        "filename": str,
-        "data": bytes,
-        "date": datetime,
-        "subject": str,
-    }
-    for each unprocessed PDF attachment found.
-    """
-    service = _build_service()
+    service = _build_service(client_id, client_secret, refresh_token)
 
     q_parts = [f"from:{sender}", "has:attachment"]
     if subject_contains:

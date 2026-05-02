@@ -10,7 +10,7 @@ from app.database import async_session_factory
 from app.models.user import User
 from app.services.auth_service import verify_token
 
-_EXEMPT_PATHS = {"/login", "/health"}
+_EXEMPT_PATHS = {"/login", "/health", "/api/gmail/oauth/callback"}
 _EXEMPT_PREFIXES = ("/static", "/previews")
 
 

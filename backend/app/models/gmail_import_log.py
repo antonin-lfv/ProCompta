@@ -12,7 +12,7 @@ from app.models.base import Base, TimestampMixin, UUIDMixin
 class GmailImportLog(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "gmail_import_log"
 
-    gmail_message_id: Mapped[str] = mapped_column(String(200), nullable=False, unique=True, index=True)
+    gmail_message_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     source_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("gmail_sources.id", ondelete="CASCADE"), nullable=False
     )

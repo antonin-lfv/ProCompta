@@ -107,7 +107,14 @@
      }">
 
   <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
+  <div class="flex items-start justify-between gap-4"
+       x-data="{
+         async disconnectGmail() {
+           if (!await AppModal.confirm('Déconnecter Gmail ? Les identifiants OAuth seront supprimés. Les sources et documents importés ne seront pas affectés.')) return;
+           await fetch('/api/gmail/credentials', { method: 'DELETE' });
+           window.location.reload();
+         }
+       }">
     <div>
       <h1 class="text-2xl font-bold text-slate-900">Automatisations</h1>
       <p class="text-sm text-slate-500 mt-0.5">Import Gmail de factures et rappels d'échéances</p>
@@ -125,17 +132,34 @@
       </p>
       {% endif %}
     </div>
-    {% if gmail_account_email %}
-    <button @click="openSync(null)"
-            class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shrink-0">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-      </svg>
-      Tout synchroniser
-    </button>
-    {% elif admin_email_is_gmail and not gmail_configured %}
-    <span class="text-xs text-slate-400 shrink-0">OAuth à configurer</span>
-    {% endif %}
+    <div class="flex items-center gap-2 shrink-0">
+      {% if gmail_account_email %}
+      <button @click="openSync(null)"
+              class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+        Tout synchroniser
+      </button>
+      <button @click="disconnectGmail()"
+              class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+              title="Déconnecter Gmail">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+        </svg>
+        Déconnecter
+      </button>
+      {% elif admin_email_is_gmail and gmail_has_credentials %}
+      <button @click="disconnectGmail()"
+              class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-500 bg-white border border-slate-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+              title="Réinitialiser la configuration Gmail">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+        Réinitialiser
+      </button>
+      {% endif %}
+    </div>
   </div>
 
   <!-- Toast -->
@@ -206,16 +230,148 @@
         <p class="text-xs text-slate-500 mt-0.5">Ce service nécessite un compte Gmail. Votre adresse de compte <code class="font-mono bg-slate-100 px-1 rounded">{{ admin_email }}</code> n'est pas une adresse Gmail.</p>
       </div>
     </div>
-    {% elif not gmail_configured %}
-    <div class="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+    {% elif oauth_success %}
+    <div class="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 text-green-600 shrink-0">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+      </svg>
+      <p class="text-sm font-medium text-green-800">Gmail connecté avec succès ! Vous pouvez maintenant créer des sources d'import et synchroniser.</p>
+    </div>
+
+    {% elif oauth_error %}
+    <div class="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-red-600 shrink-0 mt-0.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
       </svg>
       <div>
-        <p class="text-sm font-medium text-amber-800">Gmail OAuth non configuré</p>
-        <p class="text-xs text-amber-700 mt-0.5">Renseignez <code class="font-mono bg-amber-100 px-1 rounded">GMAIL_CLIENT_ID</code>, <code class="font-mono bg-amber-100 px-1 rounded">GMAIL_CLIENT_SECRET</code> et <code class="font-mono bg-amber-100 px-1 rounded">GMAIL_REFRESH_TOKEN</code> dans <code class="font-mono bg-amber-100 px-1 rounded">.env</code> puis redémarrez.</p>
+        <p class="text-sm font-medium text-red-800">Erreur lors de l'autorisation Gmail</p>
+        <p class="text-xs text-red-700 mt-0.5 font-mono">{{ oauth_error }}</p>
       </div>
     </div>
+
+    {% elif not gmail_has_token %}
+    <!-- ── Wizard OAuth ── -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden"
+         x-data="{ step: {{ '2' if gmail_has_credentials else '1' }}, credLoading: false, cid: '', csecret: '',
+           async saveCreds() {
+             if (!this.cid.trim() || !this.csecret.trim()) return;
+             this.credLoading = true;
+             const r = await fetch('/api/gmail/credentials', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ client_id: this.cid.trim(), client_secret: this.csecret.trim() }) });
+             this.credLoading = false;
+             if (r.ok) this.step = 3;
+             else await AppModal.error('Erreur lors de la sauvegarde.');
+           }
+         }">
+
+      <!-- Steps indicator -->
+      <div class="flex border-b border-slate-100">
+        <div class="flex-1 px-4 py-3 flex items-center gap-2.5" :class="step === 1 ? 'bg-indigo-50' : ''">
+          <span class="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
+                :class="step > 1 ? 'bg-green-500 text-white' : step === 1 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'">
+            <span x-show="step <= 1">1</span>
+            <svg x-show="step > 1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-3 h-3"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+          </span>
+          <span class="text-xs font-medium" :class="step === 1 ? 'text-indigo-700' : 'text-slate-400'">Google Cloud</span>
+        </div>
+        <div class="flex-1 px-4 py-3 flex items-center gap-2.5 border-x border-slate-100" :class="step === 2 ? 'bg-indigo-50' : ''">
+          <span class="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
+                :class="step > 2 ? 'bg-green-500 text-white' : step === 2 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'">2</span>
+          <span class="text-xs font-medium" :class="step === 2 ? 'text-indigo-700' : 'text-slate-400'">Identifiants</span>
+        </div>
+        <div class="flex-1 px-4 py-3 flex items-center gap-2.5" :class="step === 3 ? 'bg-indigo-50' : ''">
+          <span class="w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0"
+                :class="step === 3 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'">3</span>
+          <span class="text-xs font-medium" :class="step === 3 ? 'text-indigo-700' : 'text-slate-400'">Autoriser</span>
+        </div>
+      </div>
+
+      <!-- Step 1: Google Cloud instructions -->
+      <div x-show="step === 1" class="p-5 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-slate-800 mb-3">Configurer Google Cloud OAuth</h3>
+          <ol class="space-y-3 text-xs text-slate-600">
+            <li class="flex gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-semibold flex items-center justify-center shrink-0 text-[11px]">1</span>
+              <span>Allez sur <a href="https://console.cloud.google.com" target="_blank" class="text-indigo-600 hover:underline font-medium">console.cloud.google.com</a>, créez un projet ou sélectionnez-en un existant</span>
+            </li>
+            <li class="flex gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-semibold flex items-center justify-center shrink-0 text-[11px]">2</span>
+              <span>Activez l'<a href="https://console.developers.google.com/apis/api/gmail.googleapis.com" target="_blank" class="text-indigo-600 hover:underline font-medium">API Gmail</a> pour ce projet</span>
+            </li>
+            <li class="flex gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-semibold flex items-center justify-center shrink-0 text-[11px]">3</span>
+              <span>Dans <strong>Identifiants</strong> → <strong>Créer des identifiants</strong> → <strong>ID client OAuth 2.0</strong> - Google vous demandera d'abord de configurer l'<strong>écran de consentement</strong> : saisissez un nom d'app, votre email, choisissez <strong>Externe</strong>, et validez</span>
+            </li>
+            <li class="flex gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-semibold flex items-center justify-center shrink-0 text-[11px]">4</span>
+              <span>De retour dans <strong>Identifiants</strong> → section <strong>Clients OAuth 2.0</strong> → <strong>Créer un client</strong>, choisissez le type <strong>Application Web</strong></span>
+            </li>
+            <li class="flex gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-semibold flex items-center justify-center shrink-0 text-[11px]">5</span>
+              <span>Dans <strong>URI de redirection autorisés</strong>, ajoutez exactement :
+                <code class="block mt-1 bg-slate-100 text-slate-700 font-mono px-2 py-1 rounded text-[11px] break-all select-all">{{ gmail_redirect_uri }}</code>
+              </span>
+            </li>
+            <li class="flex gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-semibold flex items-center justify-center shrink-0 text-[11px]">6</span>
+              <span>Notez le <strong>Client ID</strong> et le <strong>Client Secret</strong> affichés - vous en aurez besoin à l'étape suivante</span>
+            </li>
+            <li class="flex gap-2.5">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-semibold flex items-center justify-center shrink-0 text-[11px]">7</span>
+              <span>Toujours dans Google Cloud, allez dans <strong>Écran de consentement OAuth</strong> → onglet <strong>Audience</strong> → <strong>Add users</strong>, et ajoutez votre adresse Gmail <code class="font-mono bg-slate-100 px-1 rounded">{{ admin_email }}</code></span>
+            </li>
+          </ol>
+        </div>
+        <div class="flex justify-end">
+          <button @click="step = 2"
+                  class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+            Suivant →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Enter credentials -->
+      <div x-show="step === 2" class="p-5 space-y-4">
+        <h3 class="text-sm font-semibold text-slate-800">Saisir les identifiants OAuth</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs font-medium text-slate-600 mb-1 block">Client ID</label>
+            <input type="text" x-model="cid" placeholder="123456789-abc...apps.googleusercontent.com"
+                   class="w-full text-sm font-mono rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-600 mb-1 block">Client Secret</label>
+            <input type="password" x-model="csecret" placeholder="GOCSPX-..."
+                   class="w-full text-sm font-mono rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+        </div>
+        <div class="flex items-center justify-between">
+          <button @click="step = 1" class="text-sm text-slate-400 hover:text-slate-600 transition-colors">← Retour</button>
+          <div class="flex gap-2">
+            <button @click="saveCreds()" :disabled="credLoading || (!cid.trim() && !csecret.trim())"
+                    class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              <span x-text="credLoading ? 'Enregistrement…' : 'Enregistrer et continuer'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Authorize -->
+      <div x-show="step === 3" class="p-5 space-y-4">
+        <h3 class="text-sm font-semibold text-slate-800">Autoriser l'accès à votre Gmail</h3>
+        <p class="text-xs text-slate-500">Cliquez sur le bouton ci-dessous. Vous serez redirigé vers Google pour autoriser ProCompta à lire vos emails en lecture seule (<code class="font-mono bg-slate-100 px-1 rounded">gmail.readonly</code>).</p>
+        <div class="flex items-center justify-between">
+          <button @click="step = 2" class="text-sm text-slate-400 hover:text-slate-600 transition-colors">← Retour</button>
+          <a href="/api/gmail/oauth/start"
+             class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4 fill-white"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Connecter mon compte Google
+          </a>
+        </div>
+      </div>
+
+    </div>
+
     {% elif gmail_account_email %}
     <div class="flex items-center justify-between gap-4 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
       <div class="flex items-start gap-3 min-w-0">
@@ -282,6 +438,12 @@
                 </svg>
               </button>
               {% endif %}
+              <button @click="$dispatch('edit-source', { id: '{{ src.id }}', name: '{{ src.name | e }}', sender_email: '{{ src.sender_email | e }}', subject_contains: '{{ src.subject_contains | e if src.subject_contains else '' }}', attachment_name_contains: '{{ src.attachment_name_contains | e if src.attachment_name_contains else '' }}', correspondent_id: '{{ src.correspondent_id | string if src.correspondent_id else '' }}', document_type_id: '{{ src.document_type_id | string if src.document_type_id else '' }}', active: {{ 'true' if src.active else 'false' }} })"
+                      class="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Modifier">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                </svg>
+              </button>
               <button @click="deleteSource('{{ src.id }}', '{{ src.name | e }}')"
                       class="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Supprimer">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
@@ -298,85 +460,6 @@
       {% endif %}
     </div>
 
-    <!-- Formulaire ajout source -->
-    <div x-show="$store.autoForms.gmail" x-cloak
-         x-transition:enter="transition ease-out duration-150"
-         x-transition:enter-start="opacity-0 -translate-y-1"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         class="bg-white rounded-xl border border-slate-200 p-4"
-         x-data="{
-           loading: false,
-           form: { name: '', sender_email: '', subject_contains: '', attachment_name_contains: '', correspondent_id: '', document_type_id: '', active: true },
-           reset() { this.form = { name: '', sender_email: '', subject_contains: '', attachment_name_contains: '', correspondent_id: '', document_type_id: '', active: true }; },
-           async submit() {
-             const f = this.form;
-             if (!f.name.trim() || !f.sender_email.trim()) return;
-             this.loading = true;
-             const body = { ...f };
-             if (!body.correspondent_id) body.correspondent_id = null;
-             if (!body.document_type_id) body.document_type_id = null;
-             if (!body.subject_contains) body.subject_contains = null;
-             if (!body.attachment_name_contains) body.attachment_name_contains = null;
-             const r = await fetch('/api/gmail/sources', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-             this.loading = false;
-             if (r.ok) { this.reset(); window.location.reload(); }
-             else { const d = await r.json().catch(() => ({})); await AppModal.error(d.detail || 'Erreur.'); }
-           }
-         }">
-      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Nouvelle source</h3>
-      <div class="grid sm:grid-cols-2 gap-3">
-        <div>
-          <label class="text-xs font-medium text-slate-600 mb-1 block">Nom affiché <span class="text-red-400">*</span></label>
-          <input type="text" x-model="form.name" placeholder="Anthropic, Scaleway…"
-                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        </div>
-        <div>
-          <label class="text-xs font-medium text-slate-600 mb-1 block">Email expéditeur <span class="text-red-400">*</span></label>
-          <input type="email" x-model="form.sender_email" placeholder="billing@anthropic.com"
-                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        </div>
-        <div>
-          <label class="text-xs font-medium text-slate-600 mb-1 block">Sujet contient <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-          <input type="text" x-model="form.subject_contains" placeholder="Invoice"
-                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        </div>
-        <div>
-          <label class="text-xs font-medium text-slate-600 mb-1 block">Pièce jointe contient <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-          <input type="text" x-model="form.attachment_name_contains" placeholder="invoice"
-                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        </div>
-        <div>
-          <label class="text-xs font-medium text-slate-600 mb-1 block">Correspondant auto <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-          <select x-model="form.correspondent_id"
-                  class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <option value="">- aucun -</option>
-            {% for c in correspondents %}
-            <option value="{{ c.id }}">{{ c.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="text-xs font-medium text-slate-600 mb-1 block">Type de document auto <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
-          <select x-model="form.document_type_id"
-                  class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <option value="">- aucun -</option>
-            {% for dt in doc_types %}
-            <option value="{{ dt.id }}">{{ dt.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div class="flex gap-2 mt-4">
-        <button @click="submit()" :disabled="loading || !form.name.trim() || !form.sender_email.trim()"
-                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-          <span x-text="loading ? 'Ajout en cours…' : 'Ajouter la source'"></span>
-        </button>
-        <button @click="$store.autoForms.gmail = false; reset()"
-                class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
-          Annuler
-        </button>
-      </div>
-    </div>
     {% endif %}
 
   </div>
@@ -451,6 +534,12 @@
               {% endif %}
             </div>
             <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button @click="$dispatch('edit-reminder', { id: '{{ r.id }}', name: '{{ r.name | e }}', description: '{{ r.description | e if r.description else '' }}', frequency_days: {{ r.frequency_days }}, next_due_date: '{{ r.next_due_date.isoformat() }}', notify_email: {{ 'true' if r.notify_email else 'false' }}, notify_inapp: {{ 'true' if r.notify_inapp else 'false' }}, active: {{ 'true' if r.active else 'false' }} })"
+                      class="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Modifier">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                </svg>
+              </button>
               <button @click="triggerNow('{{ r.id }}', '{{ r.name | e }}')"
                       class="p-1.5 rounded-md text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Envoyer (test)">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
@@ -485,29 +574,342 @@
       {% endif %}
     </div>
 
-    <!-- Formulaire ajout rappel -->
-    <div x-show="$store.autoForms.reminder" x-cloak
-         x-transition:enter="transition ease-out duration-150"
-         x-transition:enter-start="opacity-0 -translate-y-1"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         class="bg-white rounded-xl border border-slate-200 p-4"
-         x-data="{
-           loading: false,
-           form: { name: '', description: '', frequency_days: 365, next_due_date: '', notify_email: true, notify_inapp: true, active: true },
-           reset() { this.form = { name: '', description: '', frequency_days: 365, next_due_date: '', notify_email: true, notify_inapp: true, active: true }; },
-           async submit() {
-             const f = this.form;
-             if (!f.name.trim() || !f.next_due_date || !f.frequency_days) return;
-             this.loading = true;
-             const body = { ...f, frequency_days: parseInt(f.frequency_days) };
-             if (!body.description) body.description = null;
-             const r = await fetch('/api/reminders', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-             this.loading = false;
-             if (r.ok) { this.reset(); window.location.reload(); }
-             else { const d = await r.json().catch(() => ({})); await AppModal.error(d.detail || 'Erreur.'); }
-           }
-         }">
-      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Nouveau rappel</h3>
+  </div>
+
+  <!-- ── Modale édition source Gmail ── -->
+  <div x-data="{
+         show: false, editId: null,
+         form: { name: '', sender_email: '', subject_contains: '', attachment_name_contains: '', correspondent_id: '', document_type_id: '', active: true },
+         loading: false,
+         init() {
+           window.addEventListener('edit-source', e => {
+             const d = e.detail;
+             this.editId = d.id;
+             this.form = { name: d.name, sender_email: d.sender_email, subject_contains: d.subject_contains, attachment_name_contains: d.attachment_name_contains, correspondent_id: d.correspondent_id, document_type_id: d.document_type_id, active: d.active };
+             this.show = true;
+           });
+         },
+         close() { this.show = false; this.editId = null; },
+         async submit() {
+           const f = this.form;
+           if (!f.name.trim() || !f.sender_email.trim()) return;
+           this.loading = true;
+           const body = { ...f };
+           if (!body.correspondent_id) body.correspondent_id = null;
+           if (!body.document_type_id) body.document_type_id = null;
+           if (!body.subject_contains) body.subject_contains = null;
+           if (!body.attachment_name_contains) body.attachment_name_contains = null;
+           const r = await fetch('/api/gmail/sources/' + this.editId, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+           this.loading = false;
+           if (r.ok) { this.close(); window.location.reload(); }
+           else { const d = await r.json().catch(() => ({})); await AppModal.error(d.detail || 'Erreur.'); }
+         }
+       }"
+       x-show="show" x-cloak
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       @keydown.escape.window="close()"
+       class="fixed inset-0 z-50 flex items-center justify-center p-6">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="close()"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-800">Modifier la source d'import</h3>
+        <button @click="close()" class="text-slate-400 hover:text-slate-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Nom affiché <span class="text-red-400">*</span></label>
+          <input type="text" x-model="form.name" class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Email expéditeur <span class="text-red-400">*</span></label>
+          <input type="email" x-model="form.sender_email" class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Sujet contient <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <input type="text" x-model="form.subject_contains" class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Pièce jointe contient <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <input type="text" x-model="form.attachment_name_contains" class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Correspondant auto <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <div class="relative">
+            <select x-model="form.correspondent_id" class="w-full appearance-none text-sm rounded-lg border border-slate-200 px-3 py-2 pr-8 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option value="">- aucun -</option>
+              {% for c in correspondents %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Type de document auto <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <div class="relative">
+            <select x-model="form.document_type_id" class="w-full appearance-none text-sm rounded-lg border border-slate-200 px-3 py-2 pr-8 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option value="">- aucun -</option>
+              {% for dt in doc_types %}
+              <option value="{{ dt.id }}">{{ dt.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+            </div>
+          </div>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" x-model="form.active" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-400 w-4 h-4">
+            Source active
+          </label>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end pt-1">
+        <button @click="close()" class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">Annuler</button>
+        <button @click="submit()" :disabled="loading || !form.name.trim() || !form.sender_email.trim()"
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+          <span x-text="loading ? 'Enregistrement…' : 'Enregistrer'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modale édition rappel ── -->
+  <div x-data="{
+         show: false, editId: null,
+         form: { name: '', description: '', frequency_days: 365, next_due_date: '', notify_email: true, notify_inapp: true, active: true },
+         loading: false,
+         init() {
+           window.addEventListener('edit-reminder', e => {
+             const d = e.detail;
+             this.editId = d.id;
+             this.form = { name: d.name, description: d.description, frequency_days: d.frequency_days, next_due_date: d.next_due_date, notify_email: d.notify_email, notify_inapp: d.notify_inapp, active: d.active };
+             this.show = true;
+           });
+         },
+         close() { this.show = false; this.editId = null; },
+         async submit() {
+           const f = this.form;
+           if (!f.name.trim() || !f.next_due_date || !f.frequency_days) return;
+           this.loading = true;
+           const body = { ...f, frequency_days: parseInt(f.frequency_days) };
+           if (!body.description) body.description = null;
+           const r = await fetch('/api/reminders/' + this.editId, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+           this.loading = false;
+           if (r.ok) { this.close(); window.location.reload(); }
+           else { const d = await r.json().catch(() => ({})); await AppModal.error(d.detail || 'Erreur.'); }
+         }
+       }"
+       x-show="show" x-cloak
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       @keydown.escape.window="close()"
+       class="fixed inset-0 z-50 flex items-center justify-center p-6">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="close()"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-800">Modifier le rappel</h3>
+        <button @click="close()" class="text-slate-400 hover:text-slate-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div class="sm:col-span-2">
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Nom <span class="text-red-400">*</span></label>
+          <input type="text" x-model="form.name" class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Description <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <input type="text" x-model="form.description" class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Prochaine échéance <span class="text-red-400">*</span></label>
+          <input type="date" x-model="form.next_due_date" class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Fréquence (jours) <span class="text-red-400">*</span></label>
+          <input type="number" x-model="form.frequency_days" min="1" class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <div class="flex gap-1 mt-1.5">
+            <button type="button" @click="form.frequency_days = 30" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">30j</button>
+            <button type="button" @click="form.frequency_days = 90" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">90j</button>
+            <button type="button" @click="form.frequency_days = 365" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">1an</button>
+          </div>
+        </div>
+        <div class="sm:col-span-2 flex gap-6">
+          <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" x-model="form.notify_email" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-400 w-4 h-4">
+            Notification email
+          </label>
+          <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" x-model="form.notify_inapp" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-400 w-4 h-4">
+            Notification in-app
+          </label>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" x-model="form.active" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-400 w-4 h-4">
+            Rappel actif
+          </label>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end pt-1">
+        <button @click="close()" class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">Annuler</button>
+        <button @click="submit()" :disabled="loading || !form.name.trim() || !form.next_due_date || !form.frequency_days"
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+          <span x-text="loading ? 'Enregistrement…' : 'Enregistrer'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modale ajout source Gmail ── -->
+  <div x-show="$store.autoForms.gmail" x-cloak
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       @keydown.escape.window="$store.autoForms.gmail = false"
+       class="fixed inset-0 z-50 flex items-center justify-center p-6"
+       x-data="{
+         loading: false,
+         form: { name: '', sender_email: '', subject_contains: '', attachment_name_contains: '', correspondent_id: '', document_type_id: '', active: true },
+         reset() { this.form = { name: '', sender_email: '', subject_contains: '', attachment_name_contains: '', correspondent_id: '', document_type_id: '', active: true }; },
+         async submit() {
+           const f = this.form;
+           if (!f.name.trim() || !f.sender_email.trim()) return;
+           this.loading = true;
+           const body = { ...f };
+           if (!body.correspondent_id) body.correspondent_id = null;
+           if (!body.document_type_id) body.document_type_id = null;
+           if (!body.subject_contains) body.subject_contains = null;
+           if (!body.attachment_name_contains) body.attachment_name_contains = null;
+           const r = await fetch('/api/gmail/sources', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+           this.loading = false;
+           if (r.ok) { this.reset(); window.location.reload(); }
+           else { const d = await r.json().catch(() => ({})); await AppModal.error(d.detail || 'Erreur.'); }
+         }
+       }">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="$store.autoForms.gmail = false; reset()"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-800">Nouvelle source d'import Gmail</h3>
+        <button @click="$store.autoForms.gmail = false; reset()" class="text-slate-400 hover:text-slate-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Nom affiché <span class="text-red-400">*</span></label>
+          <input type="text" x-model="form.name" placeholder="Anthropic, Scaleway…"
+                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Email expéditeur <span class="text-red-400">*</span></label>
+          <input type="email" x-model="form.sender_email" placeholder="billing@anthropic.com"
+                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Sujet contient <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <input type="text" x-model="form.subject_contains" placeholder="Invoice"
+                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Pièce jointe contient <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <input type="text" x-model="form.attachment_name_contains" placeholder="invoice"
+                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Correspondant auto <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <div class="relative">
+            <select x-model="form.correspondent_id"
+                    class="w-full appearance-none text-sm rounded-lg border border-slate-200 px-3 py-2 pr-8 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option value=""></option>
+              {% for c in correspondents %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-slate-600 mb-1 block">Type de document auto <span class="text-xs font-normal text-slate-400">(optionnel)</span></label>
+          <div class="relative">
+            <select x-model="form.document_type_id"
+                    class="w-full appearance-none text-sm rounded-lg border border-slate-200 px-3 py-2 pr-8 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option value=""></option>
+              {% for dt in doc_types %}
+              <option value="{{ dt.id }}">{{ dt.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-2 justify-end pt-1">
+        <button @click="$store.autoForms.gmail = false; reset()"
+                class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">Annuler</button>
+        <button @click="submit()" :disabled="loading || !form.name.trim() || !form.sender_email.trim()"
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+          <span x-text="loading ? 'Ajout en cours…' : 'Ajouter la source'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modale ajout rappel ── -->
+  <div x-show="$store.autoForms.reminder" x-cloak
+       x-transition:enter="transition ease-out duration-150"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-100"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       @keydown.escape.window="$store.autoForms.reminder = false"
+       class="fixed inset-0 z-50 flex items-center justify-center p-6"
+       x-data="{
+         loading: false,
+         form: { name: '', description: '', frequency_days: 365, next_due_date: '', notify_email: true, notify_inapp: true, active: true },
+         reset() { this.form = { name: '', description: '', frequency_days: 365, next_due_date: '', notify_email: true, notify_inapp: true, active: true }; },
+         async submit() {
+           const f = this.form;
+           if (!f.name.trim() || !f.next_due_date || !f.frequency_days) return;
+           this.loading = true;
+           const body = { ...f, frequency_days: parseInt(f.frequency_days) };
+           if (!body.description) body.description = null;
+           const r = await fetch('/api/reminders', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+           this.loading = false;
+           if (r.ok) { this.reset(); window.location.reload(); }
+           else { const d = await r.json().catch(() => ({})); await AppModal.error(d.detail || 'Erreur.'); }
+         }
+       }">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="$store.autoForms.reminder = false; reset()"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-800">Nouveau rappel</h3>
+        <button @click="$store.autoForms.reminder = false; reset()" class="text-slate-400 hover:text-slate-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
       <div class="grid sm:grid-cols-2 gap-3">
         <div class="sm:col-span-2">
           <label class="text-xs font-medium text-slate-600 mb-1 block">Nom <span class="text-red-400">*</span></label>
@@ -526,17 +928,15 @@
         </div>
         <div>
           <label class="text-xs font-medium text-slate-600 mb-1 block">Fréquence (jours) <span class="text-red-400">*</span></label>
-          <div class="flex gap-2">
-            <input type="number" x-model="form.frequency_days" min="1" placeholder="365"
-                   class="flex-1 text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <div class="flex gap-1">
-              <button type="button" @click="form.frequency_days = 30" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">30j</button>
-              <button type="button" @click="form.frequency_days = 90" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">90j</button>
-              <button type="button" @click="form.frequency_days = 365" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">1an</button>
-            </div>
+          <input type="number" x-model="form.frequency_days" min="1" placeholder="365"
+                 class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <div class="flex gap-1 mt-1.5">
+            <button type="button" @click="form.frequency_days = 30" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">30j</button>
+            <button type="button" @click="form.frequency_days = 90" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">90j</button>
+            <button type="button" @click="form.frequency_days = 365" class="px-2 py-1 text-xs rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">1an</button>
           </div>
         </div>
-        <div class="sm:col-span-2 flex flex-col gap-3">
+        <div class="sm:col-span-2 flex gap-6">
           <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
             <input type="checkbox" x-model="form.notify_email" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-400 w-4 h-4">
             Notification email
@@ -547,18 +947,15 @@
           </label>
         </div>
       </div>
-      <div class="flex gap-2 mt-4">
+      <div class="flex gap-2 justify-end pt-1">
+        <button @click="$store.autoForms.reminder = false; reset()"
+                class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">Annuler</button>
         <button @click="submit()" :disabled="loading || !form.name.trim() || !form.next_due_date || !form.frequency_days"
                 class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
           <span x-text="loading ? 'Ajout en cours…' : 'Ajouter le rappel'"></span>
         </button>
-        <button @click="$store.autoForms.reminder = false; reset()"
-                class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
-          Annuler
-        </button>
       </div>
     </div>
-
   </div>
 
   <!-- ── Modale sélection période de synchro ── -->
