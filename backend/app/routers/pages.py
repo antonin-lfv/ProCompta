@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import json
@@ -14,12 +15,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.database import get_session
 from app.document_utils import is_complete as _is_complete, missing_body as _missing_body, sync_notification as _sync_notification_pages
 from app.models.correspondent import Correspondent
 from app.models.document import CategoryEnum, Document, document_tags
 from app.models.document_activity import ActivityEventEnum, DocumentActivity
+from app.models.gmail_source import GmailSource
 from app.models.notification import Notification, NotificationTypeEnum
+from app.models.reminder import Reminder
 from app.models.document_type import DocumentType
 from app.models.tag import Tag
 from app.services.file_service import delete_file, rename_file
@@ -455,6 +459,7 @@ async def documents_list(
     date_to: str | None = Query(default=None),
     amount_min: str | None = Query(default=None),
     amount_max: str | None = Query(default=None),
+    tag_ids: list[str] = Query(default=[]),
     sort: str = Query(default="date"),
     order: str = Query(default="desc"),
     page: int = Query(default=1, ge=1),
@@ -470,6 +475,7 @@ async def documents_list(
     _date_to = _date(date_to)
     _amount_min = _decimal(amount_min)
     _amount_max = _decimal(amount_max)
+    tag_uuids = [u for s in tag_ids if (u := _uuid(s))]
 
     base_where = [Document.archived == show_archived]
     if no_type:
@@ -486,6 +492,10 @@ async def documents_list(
         base_where.append(_eur_amount >= _amount_min)
     if _amount_max is not None:
         base_where.append(_eur_amount <= _amount_max)
+    for tid in tag_uuids:
+        base_where.append(Document.id.in_(
+            select(document_tags.c.document_id).where(document_tags.c.tag_id == tid)
+        ))
 
     total = (await session.scalar(
         select(func.count(Document.id))
@@ -508,6 +518,7 @@ async def documents_list(
     stmt = stmt.offset((page - 1) * _PAGE_SIZE).limit(_PAGE_SIZE)
     docs = list((await session.execute(stmt)).scalars().all())
 
+    tag_id_strs = [str(t) for t in tag_uuids]
     back_params = [(k, v) for k, v in [
         ("no_type", "1" if no_type else ""),
         ("no_correspondent", "1" if no_correspondent else ""),
@@ -517,7 +528,7 @@ async def documents_list(
         ("date_to", date_to or ""),
         ("amount_min", amount_min or ""),
         ("amount_max", amount_max or ""),
-    ] if v]
+    ] if v] + [("tag_ids", t) for t in tag_id_strs]
     back_url = "/documents" + ("?" + urlencode(back_params) if back_params else "")
 
     _filter_params: list[tuple[str, str]] = [
@@ -529,7 +540,7 @@ async def documents_list(
         ("date_to", date_to or ""),
         ("amount_min", amount_min or ""),
         ("amount_max", amount_max or ""),
-    ]
+    ] + [("tag_ids", t) for t in tag_id_strs]
 
     return render(request, "pages/documents.html", {
         "documents": docs,
@@ -541,7 +552,8 @@ async def documents_list(
         "date_to": date_to or "",
         "amount_min": amount_min or "",
         "amount_max": amount_max or "",
-        "has_filters": any([_date_from, _date_to, _amount_min, _amount_max, search, no_type, no_correspondent, show_archived]),
+        "tag_ids": tag_id_strs,
+        "has_filters": any([_date_from, _date_to, _amount_min, _amount_max, search, no_type, no_correspondent, show_archived, tag_uuids]),
         "back_url_encoded": quote(back_url, safe=""),
         "sort": sort,
         "order": order,
@@ -1015,6 +1027,42 @@ async def notifications_page(request: Request, session: AsyncSession = Depends(g
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
+
+@router.get("/automations", response_class=HTMLResponse)
+async def automations(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:
+    gmail_sources_result = await session.execute(select(GmailSource).order_by(GmailSource.name))
+    reminders_result = await session.execute(select(Reminder).order_by(Reminder.next_due_date))
+
+    user_email: str = request.state.user.email
+    user_email_is_gmail = user_email.lower().endswith("@gmail.com")
+
+    gmail_tag = await session.scalar(select(Tag).where(Tag.slug == "auto"))
+
+    gmail_account_email: str | None = None
+    gmail_error: str | None = None
+    if user_email_is_gmail and settings.gmail_configured:
+        from app.services.gmail_service import check_connection
+        ok, result = await asyncio.to_thread(check_connection)
+        if ok:
+            gmail_account_email = result
+        else:
+            gmail_error = result
+
+    return render(request, "pages/automations.html", {
+        "gmail_sources": list(gmail_sources_result.scalars().all()),
+        "reminders": list(reminders_result.scalars().all()),
+        "correspondents": await _correspondents(session),
+        "doc_types": await _doc_types(session),
+        "today": date.today(),
+        "admin_email": user_email,
+        "admin_email_is_gmail": user_email_is_gmail,
+        "gmail_configured": settings.gmail_configured,
+        "gmail_account_email": gmail_account_email,
+        "gmail_error": gmail_error,
+        "smtp_configured": settings.smtp_configured,
+        "gmail_tag_id": str(gmail_tag.id) if gmail_tag else None,
+    })
+
 
 @router.get("/config", response_class=HTMLResponse)
 async def config(request: Request, session: AsyncSession = Depends(get_session)) -> HTMLResponse:

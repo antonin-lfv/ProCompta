@@ -16,7 +16,7 @@ from app.middleware.auth import AuthMiddleware
 from app.models.user import User
 from app.models.document_type import DocumentType
 from app.models.tag import Tag
-from app.routers import auth, backup, correspondents, document_types, documents, notifications, pages, profile, tags
+from app.routers import auth, backup, correspondents, document_types, documents, gmail, notifications, pages, profile, reminders, tags
 from app.routers.backup import save_backup_to_disk
 from app.services.auth_service import hash_password
 from app.templating import app_version, templates
@@ -80,11 +80,37 @@ async def _seed_defaults() -> None:
         await session.commit()
 
 
+async def _reminder_loop() -> None:
+    from datetime import date
+
+    from sqlalchemy import select
+
+    from app.models.reminder import Reminder
+    from app.routers.reminders import _fire_reminder
+
+    while True:
+        await asyncio.sleep(24 * 3600)
+        try:
+            async with async_session_factory() as session:
+                today = date.today()
+                result = await session.execute(
+                    select(Reminder).where(
+                        Reminder.active == True,
+                        Reminder.next_due_date <= today,
+                    )
+                )
+                for reminder in result.scalars().all():
+                    await _fire_reminder(reminder, session)
+        except Exception:
+            logger.exception("Erreur dans la boucle de rappels")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _create_admin_user()
     await _seed_defaults()
     await _auto_backup()
+    asyncio.create_task(_reminder_loop())
     yield
 
 
@@ -107,6 +133,8 @@ app.include_router(tags.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
+app.include_router(gmail.router, prefix="/api")
+app.include_router(reminders.router, prefix="/api")
 
 
 _ERROR_MESSAGES = {

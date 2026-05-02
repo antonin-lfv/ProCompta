@@ -1,11 +1,14 @@
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
+
+_PARIS = ZoneInfo("Europe/Paris")
 
 _JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 _MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
@@ -30,10 +33,19 @@ def _highlight(text: str | None, search: str | None) -> Markup:
     return Markup(result)
 
 
+def _dt_paris(dt: datetime | None, fmt: str = "%d/%m/%Y %H:%M") -> str:
+    if not dt:
+        return ""
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(_PARIS)
+    return dt.strftime(fmt)
+
+
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.filters["date_fr"] = _date_fr
 templates.env.filters["highlight"] = _highlight
-app_version = "1.4.0"
+templates.env.filters["dt_paris"] = _dt_paris
+app_version = "1.5.0"
 
 templates.env.globals.update({
     "app_version": app_version,

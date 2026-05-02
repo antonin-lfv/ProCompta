@@ -56,6 +56,30 @@
     <!-- Séparateur -->
     <div class="border-t border-slate-700/50 mx-1 my-1"></div>
 
+    <!-- Automatisations -->
+    {% set auto_active = request.url.path == '/automations' %}
+    <a
+      href="/automations"
+      title="Automatisations"
+      class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group
+             {{ 'bg-slate-700 text-white' if auto_active else 'text-slate-400 hover:bg-slate-800 hover:text-white' }}"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+           class="w-5 h-5 shrink-0 {{ 'text-white' if auto_active else 'text-slate-400 group-hover:text-white' }}">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+      </svg>
+      <span
+        x-show="!collapsed"
+        x-transition:enter="transition-opacity duration-150 delay-100"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity duration-75"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="text-sm font-medium whitespace-nowrap"
+      >Automatisations</span>
+    </a>
+
     <!-- Configuration -->
     {% set config_active = request.url.path == '/config' %}
     <a

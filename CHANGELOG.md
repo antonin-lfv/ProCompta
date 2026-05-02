@@ -1,19 +1,46 @@
 # Changelog
 
+## [1.5.0] - 2026-05-02
+
+### Ajouté - Import automatique Gmail
+- **Sources Gmail configurables** (`gmail_sources`) - nom, expéditeur, filtre sujet, filtre pièce jointe, correspondant et type de document pré-assignés
+- **Import de factures PDF** - récupération via l'API Gmail OAuth2 (lecture seule), déduplication par hash SHA-256 et par `gmail_message_id`
+- **Log d'import** (`gmail_import_log`) - traçabilité de chaque message traité (importé / ignoré / erreur)
+- **Boutons Sync** dans la page Configuration → onglet Gmail : synchroniser une source individuelle ou toutes les sources actives en un clic
+- **Alerte "jamais synchronisé"** affichée pour chaque source sans `last_synced_at`
+
+### Ajouté - Système de rappels
+- **Table `reminders`** - nom, description, fréquence (en jours), prochaine échéance, notifications email et in-app, actif/inactif
+- **Boucle asyncio quotidienne** déclenchant automatiquement les rappels échus au démarrage et toutes les 24h
+- **Notification in-app** via le système existant (nouveau type `reminder_due`)
+- **Email de rappel** via SMTP (gmail app password) envoyé à l'adresse admin
+- **Bouton "Déclencher maintenant"** pour tester un rappel manuellement
+- **Badges visuels** "En retard" (rouge) et "Bientôt" (orange) sur les rappels à échéance dans les 7 jours
+
+### Technique
+- Nouveaux modèles : `GmailSource`, `GmailImportLog`, `Reminder`
+- Nouveaux services : `gmail_service.py` (Google API), `smtp_service.py` (envoi email)
+- Nouveaux routers : `gmail.py`, `reminders.py`
+- `config.py` étendu avec `gmail_client_id`, `gmail_client_secret`, `gmail_refresh_token`, `smtp_host/port/user/password`
+- Dépendances ajoutées : `google-api-python-client`, `google-auth-httplib2`, `google-auth-oauthlib`
+- Migration `20260502_0011` : tables `gmail_sources`, `gmail_import_log`, `reminders` + valeur `reminder_due` dans `notificationtypeenum`
+
+---
+
 ## [1.4.0] - 2026-05-01
 
-### Corrigé — Bugs comptables
+### Corrigé - Bugs comptables
 - **`vat_rate=0` écrasé à 20 à la sauvegarde** - le champ Taux TVA affichait 20 même quand la valeur stockée était 0, causant une corruption silencieuse des données à chaque sauvegarde sans modification du champ ; la condition `!= 0` a été supprimée de la logique d'affichage. Le modèle `vat_rate` n'a plus de valeur Python par défaut (était `Decimal("0.00")`) : les nouveaux documents ont `vat_rate=NULL` et affichent 20 comme suggestion, les documents existants avec 0% TVA affichent 0.
 - **Faux positif alerte devise étrangère** - `has_foreign_currency` utilisait `not d.amount_ttc_eur` au lieu de `d.amount_ttc_eur is None`, déclenchant le bandeau "montant EUR manquant" pour les documents avec un équivalent EUR égal à zéro
 - **`prorata_pct` non borné** - aucune validation n'empêchait de stocker un prorata > 100% ou < 0% ; validation ajoutée côté Pydantic (schémas `DocumentCreate` et `DocumentUpdate`) et côté form POST (clamp 0–100)
 
-### Corrigé — Bugs fonctionnels
+### Corrigé - Bugs fonctionnels
 - **Suppression groupée sans confirmation** - `bulkDelete()` supprimait les documents sélectionnés sans demander de confirmation ; `confirm()` ajouté avec le nombre de documents concernés
 - **`tag_uuids` UUID malformé → HTTP 500** - le formulaire d'édition levait `ValueError` non capturé sur un UUID invalide dans `tag_ids` ; remplacé par `_uuid()` qui retourne `None` silencieusement
 - **Erreurs silencieuses dans la configuration** - la création d'un correspondant, type ou tag en doublon (slug/nom) redirige désormais avec `?error=duplicate` et affiche un message d'erreur visible
 - **`createTag()` sans feedback** - la création rapide d'un tag depuis le formulaire d'édition n'affichait rien en cas d'erreur (doublon, réseau) ; un `alert()` est maintenant déclenché
 
-### Corrigé — Bugs visuels
+### Corrigé - Bugs visuels
 - **`has_filters` incomplet** - les filtres `no_type`, `no_correspondent` et `show_archived` n'activaient pas l'indicateur visuel de filtre sur la vue "Tous les documents"
 - **`data-amount` avec `amount_ttc_eur=0`** - les stats de section recalculées après suppression DOM utilisaient `not doc.amount_ttc_eur` (falsy pour 0), entraînant un total affiché incorrect pour les documents multi-devises avec un équivalent EUR de zéro
 

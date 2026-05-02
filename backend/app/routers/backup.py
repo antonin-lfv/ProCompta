@@ -190,7 +190,7 @@ async def restore_backup(
             try:
                 target.relative_to(storage)
             except ValueError:
-                continue  # zip slip attempt — skip
+                continue  # zip slip attempt - skip
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(zf.read(name))
 

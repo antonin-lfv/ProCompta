@@ -100,7 +100,7 @@
             {% endif %}
           </div>
           <span class="text-xs text-slate-400 shrink-0 mt-0.5">
-            {{ notif.created_at.strftime('%d/%m/%Y %H:%M') }}
+            {{ notif.created_at | dt_paris }}
           </span>
         </div>
 

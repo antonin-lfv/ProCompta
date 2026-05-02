@@ -596,7 +596,7 @@ function docEditData() {
       <div class="px-5 py-4 flex items-center justify-between bg-slate-50/50">
         <div class="flex items-center gap-3">
           <p class="text-xs text-slate-400">
-            Ajouté le {{ doc.created_at.strftime("%d/%m/%Y") if doc.created_at else "-" }}
+            Ajouté le {{ doc.created_at | dt_paris('%d/%m/%Y') if doc.created_at else "-" }}
             · {{ (doc.file_size / 1024) | round(1) }} Ko
             · {{ {"application/pdf": "PDF", "image/jpeg": "JPEG", "image/png": "PNG"}.get(doc.mime_type, doc.mime_type) }}
           </p>

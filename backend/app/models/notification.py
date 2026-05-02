@@ -12,6 +12,7 @@ from app.models.base import Base, TimestampMixin, UUIDMixin
 
 class NotificationTypeEnum(str, enum.Enum):
     incomplete_document = "incomplete_document"
+    reminder_due = "reminder_due"
 
 
 class Notification(Base, UUIDMixin, TimestampMixin):
