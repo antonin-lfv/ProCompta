@@ -148,6 +148,7 @@ async def restore_backup(
     if not sql_dump.strip():
         raise HTTPException(status_code=400, detail="Le backup est vide (database.sql vide)")
 
+    gmail_was_connected = bool(user.gmail_refresh_token)
     saved_user = {
         "id": user.id,
         "name": user.name,
@@ -201,6 +202,8 @@ async def restore_backup(
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: User.__table__.create(c, checkfirst=True))
 
+    from app.models.notification import Notification, NotificationTypeEnum
+
     async with async_session_factory() as session:
         session.add(User(
             id=saved_user["id"],
@@ -210,6 +213,12 @@ async def restore_backup(
             default_currency=saved_user["default_currency"],
             fiscal_year_start=saved_user["fiscal_year_start"],
         ))
+        if gmail_was_connected:
+            session.add(Notification(
+                type=NotificationTypeEnum.reminder_due,
+                title="Connexion Gmail perdue",
+                body="Votre connexion Gmail a été réinitialisée suite à la restauration. Relancez le wizard dans Automatisations pour reconnecter votre compte.",
+            ))
         await session.commit()
 
     return {"status": "ok"}
