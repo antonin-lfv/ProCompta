@@ -1,9 +1,10 @@
 import re
+import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -78,6 +79,44 @@ async def update_password(
     user.hashed_password = hash_password(new_pw)
     await session.commit()
     return RedirectResponse("/profile?success=password", status_code=303)
+
+
+@router.post("/profile/purge-data")
+async def purge_data(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    form = await request.form()
+    password = str(form.get("password", ""))
+    if not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Mot de passe incorrect.")
+
+    await session.execute(text("""
+        TRUNCATE
+            document_activity,
+            document_tags,
+            notifications,
+            gmail_import_log,
+            documents,
+            correspondents,
+            document_types,
+            tags,
+            reminders,
+            gmail_sources
+        RESTART IDENTITY CASCADE
+    """))
+    await session.commit()
+
+    storage = Path(settings.storage_path).resolve()
+    if storage.exists():
+        for item in storage.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item, ignore_errors=True)
+            else:
+                item.unlink(missing_ok=True)
+
+    return {"status": "ok"}
 
 
 @router.post("/profile/purge-previews")

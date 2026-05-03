@@ -15,7 +15,6 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
-    backup_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     gmail_client_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     gmail_client_secret: Mapped[str | None] = mapped_column(String(200), nullable=True)
     gmail_refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)

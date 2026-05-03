@@ -4,7 +4,17 @@
 {% block content %}
 <div class="p-6 max-w-2xl mx-auto space-y-6">
 
-  <h1 class="text-xl font-semibold text-slate-800">Profil</h1>
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-slate-800">Profil</h1>
+    <form method="POST" action="/logout">
+      <button type="submit" class="flex items-center gap-2 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 text-sm font-medium rounded-lg transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+        </svg>
+        Se déconnecter
+      </button>
+    </form>
+  </div>
 
   <!-- Alertes -->
   {% if success == 'identity' %}
@@ -120,6 +130,11 @@
        }">
     <div class="px-6 py-4">
       <h2 class="text-sm font-semibold text-slate-700">Backup</h2>
+    </div>
+    <div class="px-6 py-4 bg-slate-50/60 border-b border-slate-100">
+      <p class="text-xs text-slate-600 leading-relaxed">
+        Un backup est une archive <code class="font-mono bg-slate-100 px-1 rounded">.zip</code> contenant l'intégralité de vos données : documents et leurs fichiers, correspondants, types, tags, rappels, sources Gmail et logs d'import. Il ne contient pas votre compte utilisateur (mot de passe, email). Vous pouvez le restaurer sur n'importe quelle instance ProCompta.
+      </p>
     </div>
     <div class="px-6 py-5 space-y-5">
 
@@ -243,17 +258,182 @@
     </div>
   </div>
 
-  <!-- Déconnexion -->
-  <div class="flex justify-end pb-6">
-    <form method="POST" action="/logout">
-      <button type="submit" class="flex items-center gap-2 px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-600 text-sm font-medium rounded-lg transition-colors">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-        </svg>
-        Se déconnecter
+  <!-- Zone dangereuse -->
+  <div x-data="{
+    showPurge: false, purgePassword: '', purgeConfirm: '', purgeLoading: false, purgeError: null,
+    showReset: false, copied: false,
+    resetCmd: 'docker-compose down --rmi all\nrm -rf postgres_data storage',
+    async doPurge() {
+      if (this.purgeConfirm !== 'SUPPRIMER') return;
+      this.purgeLoading = true; this.purgeError = null;
+      const fd = new FormData(); fd.append('password', this.purgePassword);
+      try {
+        const r = await fetch('/profile/purge-data', { method: 'POST', body: fd });
+        const d = await r.json();
+        if (!r.ok) { this.purgeError = d.detail || 'Erreur'; return; }
+        window.location.href = '/login';
+      } catch(e) { this.purgeError = e.message; }
+      finally { this.purgeLoading = false; }
+    },
+    async copyReset() {
+      await navigator.clipboard.writeText(this.resetCmd);
+      this.copied = true; setTimeout(() => this.copied = false, 2000);
+    }
+  }" class="border border-red-200 rounded-xl divide-y divide-red-100 overflow-hidden">
+
+    <div class="px-6 py-4 bg-red-50/40">
+      <h2 class="text-sm font-semibold text-red-700">Zone dangereuse</h2>
+    </div>
+
+    <!-- Purge données -->
+    <div class="px-6 py-5 flex items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-medium text-slate-800">Supprimer toutes les données</p>
+        <p class="text-xs text-slate-500 mt-0.5">Supprime documents, fichiers, correspondants, tags, rappels et automatisations. Le compte utilisateur et les backups sont conservés.</p>
+      </div>
+      <button @click="showPurge = true"
+              class="shrink-0 px-4 py-2 text-sm font-medium text-red-600 border border-red-300 bg-white hover:bg-red-50 rounded-lg transition-colors">
+        Supprimer les données
       </button>
-    </form>
+    </div>
+
+    <!-- Full reset -->
+    <div class="px-6 py-5 flex items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-medium text-slate-800">Réinitialisation complète</p>
+        <p class="text-xs text-slate-500 mt-0.5">Supprime containers, images et volumes Docker. Les backups sont conservés.</p>
+      </div>
+      <button @click="showReset = true"
+              class="shrink-0 px-4 py-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-900 rounded-lg transition-colors">
+        Réinitialiser
+      </button>
+    </div>
+
+    <!-- Modale purge données -->
+    <div x-show="showPurge" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+         @keydown.escape.window="if(showPurge) { showPurge=false; purgePassword=''; purgeConfirm=''; purgeError=null; }">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-red-600">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-slate-900">Supprimer toutes les données</h3>
+            <p class="text-sm text-slate-500 mt-0.5">Cette opération est <strong>irréversible</strong>. Faites un backup d'abord.</p>
+          </div>
+        </div>
+
+        <ul class="text-xs text-slate-600 space-y-1 bg-slate-50 rounded-lg px-4 py-3 list-disc list-inside">
+          <li>Tous les documents et leurs fichiers associés</li>
+          <li>Correspondants, types de documents, tags</li>
+          <li>Rappels, sources Gmail et logs d'import</li>
+          <li>Notifications et historique d'activité</li>
+          <li class="text-green-700 font-medium list-none flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+            Votre compte utilisateur est conservé
+          </li>
+          <li class="text-green-700 font-medium list-none flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+            Vos backups (<code class="font-mono text-green-800 bg-green-50 px-1 rounded">backups/</code>) sont conservés
+          </li>
+        </ul>
+
+        <div x-show="purgeError" x-cloak class="px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700" x-text="purgeError"></div>
+
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1.5">
+              Tapez <code class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 font-mono text-xs">SUPPRIMER</code> pour confirmer
+            </label>
+            <input type="text" x-model="purgeConfirm" placeholder="SUPPRIMER"
+                   autocomplete="off" spellcheck="false"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1.5">Mot de passe</label>
+            <input type="password" x-model="purgePassword" placeholder="Votre mot de passe actuel"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-1">
+          <button @click="showPurge=false; purgePassword=''; purgeConfirm=''; purgeError=null"
+                  class="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Annuler
+          </button>
+          <button @click="doPurge()"
+                  :disabled="purgeConfirm !== 'SUPPRIMER' || !purgePassword || purgeLoading"
+                  class="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <span x-text="purgeLoading ? 'Suppression…' : 'Confirmer la suppression'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale réinitialisation complète -->
+    <div x-show="showReset" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+         @keydown.escape.window="if(showReset) showReset=false">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-5">
+
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-slate-700">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-slate-900">Réinitialisation complète</h3>
+            <p class="text-sm text-slate-500 mt-0.5">À exécuter depuis un terminal, dans le dossier du projet.</p>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 space-y-2 text-xs text-slate-600">
+          <p class="font-medium text-slate-700">Ce que ces commandes font :</p>
+          <ul class="space-y-1 list-disc list-inside">
+            <li>Arrête et supprime les containers <code class="font-mono bg-slate-100 px-1 rounded">procompta-api</code>, <code class="font-mono bg-slate-100 px-1 rounded">procompta-db</code>, <code class="font-mono bg-slate-100 px-1 rounded">procompta-caddy</code></li>
+            <li>Supprime les images Docker construites</li>
+            <li>Supprime les données PostgreSQL (<code class="font-mono bg-slate-100 px-1 rounded">postgres_data/</code>) et les fichiers (<code class="font-mono bg-slate-100 px-1 rounded">storage/</code>)</li>
+            <li class="text-green-700 font-medium">Le dossier <code class="font-mono bg-green-50 px-1 rounded">backups/</code> n'est pas touché</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-slate-600">Commandes à exécuter</span>
+            <button @click="copyReset()"
+                    class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors"
+                    :class="copied ? 'text-green-700 border-green-300 bg-green-50' : 'text-slate-600 border-slate-300 hover:bg-slate-50'">
+              <svg x-show="!copied" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+              </svg>
+              <svg x-show="copied" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3.5 h-3.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+              </svg>
+              <span x-text="copied ? 'Copié !' : 'Copier'"></span>
+            </button>
+          </div>
+          <pre class="rounded-xl px-4 py-3.5 text-xs font-mono leading-relaxed overflow-x-auto select-all" style="background:#1e293b;color:#e2e8f0;">docker-compose down --rmi all
+rm -rf postgres_data storage</pre>
+        </div>
+
+        <p class="text-xs text-slate-400">Après suppression, relancez avec <code class="font-mono bg-slate-100 text-slate-600 px-1 rounded">docker-compose up -d --build</code> pour repartir de zéro.</p>
+
+        <div class="flex justify-end pt-1">
+          <button @click="showReset = false"
+                  class="px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
+
 
 </div>
 {% endblock %}
