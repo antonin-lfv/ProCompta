@@ -154,8 +154,6 @@ async def restore_backup(
         "name": user.name,
         "email": user.email,
         "hashed_password": user.hashed_password,
-        "default_currency": user.default_currency,
-        "fiscal_year_start": user.fiscal_year_start,
     }
 
     db = _parse_db_url()
@@ -210,8 +208,6 @@ async def restore_backup(
             name=saved_user["name"],
             email=saved_user["email"],
             hashed_password=saved_user["hashed_password"],
-            default_currency=saved_user["default_currency"],
-            fiscal_year_start=saved_user["fiscal_year_start"],
         ))
         if gmail_was_connected:
             session.add(Notification(

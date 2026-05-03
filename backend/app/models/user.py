@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,8 +15,6 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
-    default_currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="EUR")
-    fiscal_year_start: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     backup_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     gmail_client_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     gmail_client_secret: Mapped[str | None] = mapped_column(String(200), nullable=True)

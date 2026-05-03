@@ -16,11 +16,6 @@ from app.templating import render
 
 router = APIRouter(tags=["profile"])
 
-_CURRENCIES = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD"]
-_MONTHS = [
-    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
-]
 
 
 @router.get("/profile")
@@ -32,8 +27,6 @@ async def profile_page(
     error = request.query_params.get("error")
     return render(request, "pages/profile.html", {
         "user": user,
-        "currencies": _CURRENCIES,
-        "months": _MONTHS,
         "success": success,
         "error": error,
     })
@@ -85,26 +78,6 @@ async def update_password(
     user.hashed_password = hash_password(new_pw)
     await session.commit()
     return RedirectResponse("/profile?success=password", status_code=303)
-
-
-@router.post("/profile/preferences")
-async def update_preferences(
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-) -> RedirectResponse:
-    form = await request.form()
-    currency = str(form.get("default_currency", "EUR")).strip()
-    if currency in _CURRENCIES:
-        user.default_currency = currency
-    try:
-        month = int(form.get("fiscal_year_start", 1))
-        if 1 <= month <= 12:
-            user.fiscal_year_start = month
-    except (ValueError, TypeError):
-        pass
-    await session.commit()
-    return RedirectResponse("/profile?success=preferences", status_code=303)
 
 
 @router.post("/profile/purge-previews")

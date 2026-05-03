@@ -81,40 +81,6 @@
     </form>
   </div>
 
-  <!-- Préférences -->
-  <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-    <div class="px-6 py-4">
-      <h2 class="text-sm font-semibold text-slate-700">Préférences</h2>
-    </div>
-    <form method="POST" action="/profile/preferences" class="px-6 py-5 space-y-4">
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1.5">Devise par défaut</label>
-          <select name="default_currency"
-                  class="w-full h-9 bg-white border border-slate-300 rounded-lg px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
-            {% for c in currencies %}
-            <option value="{{ c }}" {% if user.default_currency == c %}selected{% endif %}>{{ c }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1.5">Début de l'exercice fiscal</label>
-          <select name="fiscal_year_start"
-                  class="w-full h-9 bg-white border border-slate-300 rounded-lg px-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
-            {% for m in months %}
-            <option value="{{ loop.index }}" {% if user.fiscal_year_start == loop.index %}selected{% endif %}>{{ m }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div class="flex justify-end">
-        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
-          Enregistrer
-        </button>
-      </div>
-    </form>
-  </div>
-
   <!-- Backup -->
   <div class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100"
        x-data="{
