@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.5.3] - 2026-05-03
+
+### Ajouté
+
+- **Tour d'onboarding guidé** — visite interactive en 9 étapes couvrant la navigation, le tableau de bord, l'import de documents, la vue annuelle, les rapports, la configuration, les automatisations Gmail et les notifications ; overlay SVG avec spotlight indigo sur chaque élément, popover positionné dynamiquement (flip automatique si débordement viewport), barre de progression et indicateur de points animés
+- **Bouton `?` dans la navbar** — à gauche de la cloche, relance le tour depuis l'étape 1 depuis n'importe quelle page
+- **Déclenchement automatique à la première connexion** — le tour s'affiche 900 ms après le premier chargement du tableau de bord ; ne se redéclenche plus une fois terminé
+- **Persistance inter-pages** — l'état courant (`procompta-tour-state`) est sauvegardé en `localStorage` ; le tour navigue automatiquement entre les pages et reprend à la bonne étape en cas de rechargement ; `procompta-tour-done` marque la fin définitive
+
+### Technique
+
+- `static/js/onboarding.js` — moteur de tour auto-contenu (384 lignes, zéro dépendance externe) exposé via `window.ProComptaTour.start()` / `.end()`
+- Overlay SVG avec `<mask>` : fond `rgba(15,23,42,0.78)` percé d'un trou transparent sur l'élément ciblé + anneau indigo `stroke="#6366f1"`
+- `anyPage: true` sur la dernière étape (notification bell) — affiché sans navigation depuis la page courante
+- IDs `tour-*` ajoutés sur les ancres dans `dashboard.html`, `year.html`, `reports.html`, `config.html`, `automations.html`, `navbar.html`
+
+---
+
+## [1.5.2] - 2026-05-02
+
+### Ajouté
+- **Saisie manuelle** — création d'un document sans fichier joint (EDF, abonnement, ventilation) via bouton "Saisie manuelle" dans la vue année ; génère un PDF récapitulatif minimaliste côté serveur (titre, date, montants, correspondant, type, notes) stocké et prévisualisable comme tout autre document
+- **Export FEC** — `GET /reports/export/fec?year=` génère un fichier `FEC_{SIREN}_{YYYYMMDD}.txt` conforme au format DGFiP (séparateur `|`, encodage UTF-8 avec BOM) ; accessible depuis l'onglet Rapports et depuis le bouton Bilan de la vue année
+- **Filtres sauvegardés** — les filtres actifs (correspondant, type, tags, statut archivé, no_type, no_correspondent, recherche texte, plage de dates, plage de montants) sont persistés dans `sessionStorage` par vue et restaurés automatiquement à la prochaine visite
+- **Type correspondant** — champ `type` (`client | fournisseur | autre`) sur les correspondants ; badge coloré dans les listes et formulaires ; filtre par type dans la configuration
+- **Statut encaissement** — champ `is_paid` (booléen) sur les recettes uniquement ; badge "À encaisser" / "Encaissé" dans les tableaux ; widget "À encaisser" sur le dashboard (montant total + lien filtré) ; filtre `is_paid` dans la vue année
+
+### Technique
+- `POST /api/documents/manual` — génère un PDF minimal via `reportlab`, upload et retourne le document créé
+- `GET /reports/export/fec` — query SQLAlchemy avec `selectinload` correspondant/type, numérotation `EcritureNum` séquentielle, comptes généraux par défaut selon catégorie (6xx dépenses, 7xx recettes)
+- Colonnes `is_paid BOOLEAN NULL` et `type VARCHAR(20) NULL` ajoutées (migrations `0016`, `0017`)
+
+---
+
 ## [1.5.1] - 2026-05-02
 
 ### Corrigé - Gmail OAuth & import

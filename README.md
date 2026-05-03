@@ -5,7 +5,7 @@
 <h4 align="center">Gestionnaire de documents comptables · local · sans abonnement · sans cloud.</h4>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.5.1-green.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.5.3-green.svg" alt="Version">
   <img src="https://img.shields.io/badge/Python-3.13+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/PostgreSQL-16-orange.svg" alt="PostgreSQL">
   <img src="https://img.shields.io/badge/Docker-ready-2496ED.svg" alt="Docker">

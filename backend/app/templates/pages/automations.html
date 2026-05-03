@@ -52,7 +52,7 @@
 </div>
 
 <!-- ── Page principale ── -->
-<div class="max-w-3xl mx-auto space-y-6"
+<div id="tour-automations" class="max-w-3xl mx-auto space-y-6"
      x-data="{
        tab: sessionStorage.getItem('autoTab') || 'gmail',
        setTab(t) { this.tab = t; sessionStorage.setItem('autoTab', t); },
@@ -107,7 +107,7 @@
      }">
 
   <!-- Header -->
-  <div class="flex items-start justify-between gap-4"
+  <div id="tour-automations-header" class="flex items-start justify-between gap-4"
        x-data="{
          async disconnectGmail() {
            if (!await AppModal.confirm('Déconnecter Gmail ? Les identifiants OAuth seront supprimés. Les sources et documents importés ne seront pas affectés.')) return;
