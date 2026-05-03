@@ -60,6 +60,18 @@ function yearData() {
 
   return {
     showFilters: {{ 'true' if has_filters else 'false' }},
+    savedFilters: JSON.parse(localStorage.getItem('pc_saved_filters') || '[]'),
+    saveFilter() {
+      const name = prompt('Nom du filtre sauvegardé :');
+      if (!name || !name.trim()) return;
+      const url = window.location.href;
+      this.savedFilters = [...this.savedFilters, { name: name.trim(), url }];
+      localStorage.setItem('pc_saved_filters', JSON.stringify(this.savedFilters));
+    },
+    deleteFilter(i) {
+      this.savedFilters = this.savedFilters.filter((_, idx) => idx !== i);
+      localStorage.setItem('pc_saved_filters', JSON.stringify(this.savedFilters));
+    },
     dragOver: false,
     sections: { depenses: 1, recettes: 1, autres: 1, archived: 1 },
     rowVisible(section, idx) {
@@ -468,6 +480,15 @@ function yearData() {
         </svg>
         Bilan
       </a>
+      <button
+        @click="$dispatch('open-manual-entry')"
+        class="relative group inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors">
+        {{ tooltip("Créer une écriture sans fichier (EDF, ventilation mensuelle, etc.)", "bottom") }}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+        </svg>
+        Saisie manuelle
+      </button>
       <label class="relative group inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white cursor-pointer hover:bg-indigo-700 transition-colors">
         {{ tooltip("Importer un ou plusieurs fichiers PDF, JPEG ou PNG", "bottom") }}
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
@@ -529,7 +550,7 @@ function yearData() {
        x-transition:leave="transition ease-in duration-100"
        x-transition:leave-start="opacity-100 translate-y-0"
        x-transition:leave-end="opacity-0 -translate-y-2">
-    <form method="GET" action="/year/{{ year }}"
+    <form id="year-filter-form" method="GET" action="/year/{{ year }}"
           class="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {% if show_category %}<input type="hidden" name="category" value="{{ show_category }}">{% endif %}
       <div>
@@ -557,19 +578,26 @@ function yearData() {
         <input type="text" name="search" value="{{ filters.search }}" placeholder="Facture EDF…"
                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
       </div>
-      <div class="flex items-end gap-2">
-        <button type="submit"
-                class="flex-1 h-10 px-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-          Filtrer
-        </button>
-        {% if has_filters %}
-          <a href="/year/{{ year }}"
-             class="h-10 px-3 flex items-center bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors whitespace-nowrap">
-            Réinitialiser
-          </a>
-        {% endif %}
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Statut encaissement</label>
+        <select name="is_paid"
+                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <option value="">Tous</option>
+          <option value="false" {{ "selected" if filters.is_paid == 'false' else "" }}>En attente</option>
+          <option value="true"  {{ "selected" if filters.is_paid == 'true'  else "" }}>Encaissé</option>
+        </select>
       </div>
-      <!-- Ligne 2 : dates + montants -->
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Type de correspondant</label>
+        <select name="correspondent_type"
+                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <option value="">Tous</option>
+          <option value="client"      {{ "selected" if filters.correspondent_type == 'client'      else "" }}>Client</option>
+          <option value="fournisseur" {{ "selected" if filters.correspondent_type == 'fournisseur' else "" }}>Fournisseur</option>
+          <option value="les_deux"    {{ "selected" if filters.correspondent_type == 'les_deux'    else "" }}>Client / Fournisseur</option>
+        </select>
+      </div>
+      <!-- Ligne 2 : dates + montants + actions -->
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Date début</label>
         <input type="date" name="date_from" value="{{ filters.date_from }}"
@@ -590,7 +618,48 @@ function yearData() {
         <input type="number" name="amount_max" value="{{ filters.amount_max }}" min="0" step="0.01" placeholder="∞"
                class="w-full h-10 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
       </div>
+      <div class="lg:col-span-4 flex items-center gap-2 pt-1 border-t border-slate-100">
+        <button type="submit"
+                class="h-9 px-4 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+          Filtrer
+        </button>
+        {% if has_filters %}
+          <a href="/year/{{ year }}"
+             class="h-9 px-3 flex items-center bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors">
+            Réinitialiser
+          </a>
+        {% endif %}
+        {% if has_filters %}
+        <button type="button"
+                @click="saveFilter()"
+                class="h-9 px-4 flex items-center gap-1.5 bg-white text-slate-600 border border-slate-200 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors ml-auto whitespace-nowrap">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5 shrink-0">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+          </svg>
+          Sauvegarder ce filtre
+        </button>
+        {% endif %}
+      </div>
     </form>
+
+    <!-- Filtres sauvegardés -->
+    <div x-show="savedFilters.length > 0" x-cloak
+         class="flex flex-wrap items-center gap-2 mt-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+      <span class="text-xs text-slate-400 font-medium shrink-0">Favoris :</span>
+      <template x-for="(f, i) in savedFilters" :key="i">
+        <div class="flex items-center rounded-lg overflow-hidden border border-slate-200 shadow-sm">
+          <a :href="f.url"
+             class="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-white text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+             x-text="f.name"></a>
+          <button @click="deleteFilter(i)"
+                  class="px-2 py-1.5 bg-white border-l border-slate-200 text-slate-300 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-3 h-3">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </template>
+    </div>
   </div>
 
   {% if not documents %}
@@ -682,6 +751,16 @@ function yearData() {
           {% endif %}
           {% if doc.prorata_pct is not none %}
             <span class="text-xs font-normal text-amber-600 block">~{{ doc.prorata_pct | int }}%</span>
+          {% endif %}
+          {% if doc.category.value == 'recette' %}
+            {% if doc.payment_date %}
+              <span class="text-xs font-normal text-green-600 block">Encaissé</span>
+            {% else %}
+              <span class="text-xs font-normal text-amber-600 block">En attente</span>
+            {% endif %}
+          {% endif %}
+          {% if doc.is_manual %}
+            <span class="text-xs font-normal text-violet-500 block">Manuel</span>
           {% endif %}
         </td>
         <td class="px-2 py-3">
@@ -1265,6 +1344,266 @@ function yearData() {
   </div>
   </template>
 
+  <!-- ── Modal saisie manuelle ────────────────────────────────────────────────── -->
+  <div x-data="{
+    open: false,
+    saving: false,
+    fetchingConversion: false,
+    error: '',
+    form: { title: '', category: 'depense', document_date: new Date().toISOString().split('T')[0], payment_date: '', amount_ht: '', vat_rate: '20', vat_amount: '', amount_ttc: '', currency: 'EUR', amount_ttc_eur: '', correspondent_id: '', document_type_id: '', notes: '' },
+    calcTax() {
+      const ht = parseFloat(this.form.amount_ht);
+      const rate = parseFloat(this.form.vat_rate);
+      if (!isNaN(ht) && !isNaN(rate) && rate >= 0) {
+        const vat = parseFloat((ht * rate / 100).toFixed(2));
+        this.form.vat_amount = vat.toFixed(2);
+        this.form.amount_ttc = (ht + vat).toFixed(2);
+      }
+    },
+    async fetchConversion() {
+      if (this.form.currency === 'EUR') return;
+      const amount = parseFloat(this.form.amount_ttc);
+      if (!amount) return;
+      this.fetchingConversion = true;
+      try {
+        const resp = await fetch('/api/documents/convert-currency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currency: this.form.currency, amount, date: this.form.payment_date || this.form.document_date || null }),
+        });
+        if (resp.ok) { const data = await resp.json(); this.form.amount_ttc_eur = data.amount_eur; }
+      } finally { this.fetchingConversion = false; }
+    },
+    async save() {
+      if (!this.form.title.trim() || !this.form.document_date) { this.error = 'Titre et date obligatoires.'; return; }
+      this.saving = true; this.error = '';
+      const body = {
+        title: this.form.title.trim(),
+        category: this.form.category,
+        document_date: this.form.document_date,
+        payment_date: (this.form.category !== 'autre' && this.form.payment_date) ? this.form.payment_date : null,
+        amount_ht: (this.form.category !== 'autre' && this.form.amount_ht !== '') ? parseFloat(this.form.amount_ht) : null,
+        vat_amount: (this.form.category !== 'autre' && this.form.vat_amount !== '') ? parseFloat(this.form.vat_amount) : null,
+        vat_rate: (this.form.category !== 'autre' && this.form.vat_rate !== '') ? parseFloat(this.form.vat_rate) : null,
+        amount_ttc: (this.form.category !== 'autre' && this.form.amount_ttc !== '') ? parseFloat(this.form.amount_ttc) : null,
+        amount_ttc_eur: (this.form.category !== 'autre' && this.form.currency !== 'EUR' && this.form.amount_ttc_eur !== '') ? parseFloat(this.form.amount_ttc_eur) : null,
+        currency: this.form.currency || 'EUR',
+        correspondent_id: this.form.correspondent_id || null,
+        document_type_id: this.form.document_type_id || null,
+        notes: this.form.notes.trim() || null,
+      };
+      try {
+        const resp = await fetch('/api/documents/manual', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (resp.status === 201) {
+          const doc = await resp.json();
+          window.location.href = '/documents/' + doc.id + '/edit';
+        } else {
+          const d = await resp.json().catch(() => ({}));
+          this.error = d.detail || 'Erreur lors de la création.';
+        }
+      } catch(e) { this.error = 'Impossible de joindre le serveur.'; }
+      this.saving = false;
+    },
+  }"
+  @open-manual-entry.window="open = true; form.document_date = new Date().toISOString().split('T')[0]; error = ''"
+  @keydown.escape.window="open = false">
+
+    <template x-if="open">
+      <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-slate-900/40" @click="open = false"></div>
+
+        <!-- Modal -->
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-10">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-violet-600">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-base font-semibold text-slate-900">Saisie manuelle</h2>
+                <p class="text-xs text-slate-500">Entrée comptable sans fichier joint</p>
+              </div>
+            </div>
+            <button @click="open = false" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="px-6 py-5 space-y-4">
+            <!-- Erreur -->
+            <div x-show="error" class="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700" x-text="error"></div>
+
+            <!-- Catégorie -->
+            <div class="flex gap-2">
+              <label class="flex-1 cursor-pointer">
+                <input type="radio" x-model="form.category" value="depense" class="sr-only">
+                <div class="flex items-center justify-center py-2 rounded-lg border-2 text-sm font-medium transition-colors"
+                     :class="form.category === 'depense' ? 'bg-red-50 border-red-400 text-red-600' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+                  Dépense
+                </div>
+              </label>
+              <label class="flex-1 cursor-pointer">
+                <input type="radio" x-model="form.category" value="recette" class="sr-only">
+                <div class="flex items-center justify-center py-2 rounded-lg border-2 text-sm font-medium transition-colors"
+                     :class="form.category === 'recette' ? 'bg-green-50 border-green-400 text-green-600' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+                  Recette
+                </div>
+              </label>
+              <label class="flex-1 cursor-pointer">
+                <input type="radio" x-model="form.category" value="autre" class="sr-only">
+                <div class="flex items-center justify-center py-2 rounded-lg border-2 text-sm font-medium transition-colors"
+                     :class="form.category === 'autre' ? 'bg-slate-100 border-slate-400 text-slate-600' : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+                  Autre
+                </div>
+              </label>
+            </div>
+
+            <!-- Titre + date -->
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Titre <span class="text-red-500">*</span></label>
+              <input type="text" x-model="form.title" placeholder="EDF janvier 2025…"
+                     class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Date <span class="text-red-500">*</span></label>
+                <input type="date" x-model="form.document_date"
+                       class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              </div>
+              <div x-show="form.category !== 'autre'">
+                <label class="block text-xs font-medium text-slate-700 mb-1">Date de paiement</label>
+                <input type="date" x-model="form.payment_date"
+                       class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              </div>
+            </div>
+
+            <!-- Correspondant + type -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Correspondant</label>
+                <select x-model="form.correspondent_id"
+                        class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                  <option value=""></option>
+                  <template x-for="c in correspondents" :key="c.id">
+                    <option :value="c.id" x-text="c.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Type</label>
+                <select x-model="form.document_type_id"
+                        class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                  <option value=""></option>
+                  <template x-for="dt in docTypes" :key="dt.id">
+                    <option :value="dt.id" x-text="dt.name"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+
+            <!-- Montants -->
+            <div x-show="form.category !== 'autre'" class="space-y-3">
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">Devise</label>
+                  <select x-model="form.currency" @change="form.amount_ttc_eur = ''"
+                          class="w-full h-9 text-sm rounded-lg border border-slate-200 px-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                    <option value="GBP">GBP</option>
+                    <option value="CHF">CHF</option>
+                    <option value="JPY">JPY</option>
+                    <option value="CAD">CAD</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">HT</label>
+                  <input type="number" step="0.01" min="0" x-model="form.amount_ht" placeholder="0.00"
+                         class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">TVA %</label>
+                  <input type="number" step="0.1" min="0" max="100" x-model="form.vat_rate" placeholder="20"
+                         class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <span class="block text-xs mb-1" style="visibility:hidden">x</span>
+                  <button type="button" @click="calcTax()"
+                          title="Calculer TVA et TTC depuis HT × taux"
+                          class="w-full h-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                  </button>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">TVA</label>
+                  <input type="number" step="0.01" min="0" x-model="form.vat_amount" placeholder="0.00"
+                         class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">TTC</label>
+                  <input type="number" step="0.01" min="0" x-model="form.amount_ttc" placeholder="0.00"
+                         class="w-full h-9 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+              </div>
+              <!-- Équivalent EUR si devise étrangère -->
+              <div x-show="form.currency !== 'EUR'">
+                <label class="block text-xs font-medium text-slate-700 mb-1">Équivalent EUR</label>
+                <div class="flex gap-1">
+                  <input type="number" step="0.01" min="0" x-model="form.amount_ttc_eur" placeholder="0.00"
+                         class="flex-1 h-9 text-sm rounded-lg border border-slate-200 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                  <button type="button" @click="fetchConversion()" :disabled="fetchingConversion"
+                          title="Recalculer via BCE (taux à la date de paiement ou du jour)"
+                          class="px-2.5 h-9 rounded-lg border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 disabled:opacity-50 transition-colors shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                         class="w-4 h-4" :class="fetchingConversion ? 'animate-spin' : ''">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                  </button>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Taux BCE à la date de paiement (ou du jour)</p>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">Notes</label>
+              <textarea x-model="form.notes" rows="2" placeholder="Ref. contrat, détail…" maxlength="250"
+                        class="w-full text-sm rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"></textarea>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+            <button @click="open = false" class="px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+              Annuler
+            </button>
+            <button @click="save()" :disabled="saving"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              <svg x-show="saving" class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <svg x-show="!saving" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              Créer l'entrée
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
 
 </div>
 {% endblock %}

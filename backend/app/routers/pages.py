@@ -230,6 +230,22 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         for r in top_corr_result.all()
     ]
 
+    # Recettes à encaisser (sans date de paiement)
+    recettes_impayees_count = (await session.scalar(
+        select(func.count(Document.id)).where(
+            *_year_filter,
+            Document.category == CategoryEnum.recette,
+            Document.payment_date.is_(None),
+        )
+    )) or 0
+    recettes_impayees_total = (await session.scalar(
+        select(func.sum(_eur_amount)).where(
+            *_year_filter,
+            Document.category == CategoryEnum.recette,
+            Document.payment_date.is_(None),
+        )
+    )) or Decimal("0")
+
     recent_result = await session.execute(
         select(Document)
         .options(selectinload(Document.correspondent), selectinload(Document.document_type), selectinload(Document.tags))
@@ -257,6 +273,8 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         "no_type_count": no_type_count,
         "no_correspondent_count": no_correspondent_count,
         "recent_documents": list(recent_result.scalars().all()),
+        "recettes_impayees_count": recettes_impayees_count,
+        "recettes_impayees_total": recettes_impayees_total,
     })
 
 
@@ -301,6 +319,8 @@ async def year_view(
     sort: str = Query(default="date"),
     order: str = Query(default="desc"),
     category: str | None = Query(default=None),
+    is_paid: str | None = Query(default=None),
+    correspondent_type: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> HTMLResponse:
     _VALID_CATEGORIES = {"depenses", "recettes", "autres", "archived"}
@@ -313,6 +333,11 @@ async def year_view(
     _date_to = _date(date_to)
     _amount_min = _decimal(amount_min)
     _amount_max = _decimal(amount_max)
+    _is_paid: bool | None | str = None
+    if is_paid == "true":
+        _is_paid = True
+    elif is_paid == "false":
+        _is_paid = False
 
     if sort not in _SORT_COLS:
         sort = "date"
@@ -340,6 +365,17 @@ async def year_view(
         stmt = stmt.where(_eur_amount >= _amount_min)
     if _amount_max is not None:
         stmt = stmt.where(_eur_amount <= _amount_max)
+    if _is_paid is True:
+        stmt = stmt.where(Document.payment_date.isnot(None))
+    elif _is_paid is False:
+        stmt = stmt.where(Document.payment_date.is_(None), Document.category == CategoryEnum.recette)
+    if correspondent_type:
+        from app.models.correspondent import CorrespondentTypeEnum
+        try:
+            _corr_type_enum = CorrespondentTypeEnum(correspondent_type)
+            stmt = stmt.where(Correspondent.type == _corr_type_enum)
+        except ValueError:
+            pass
     for tid in tag_uuids:
         stmt = stmt.where(Document.id.in_(
             select(document_tags.c.document_id).where(document_tags.c.tag_id == tid)
@@ -396,6 +432,8 @@ async def year_view(
         ("date_to", date_to or ""),
         ("amount_min", amount_min or ""),
         ("amount_max", amount_max or ""),
+        ("is_paid", is_paid or ""),
+        ("correspondent_type", correspondent_type or ""),
         *[("tag_ids", str(t)) for t in tag_uuids],
     ]
 
@@ -432,8 +470,10 @@ async def year_view(
             "date_to": date_to or "",
             "amount_min": amount_min or "",
             "amount_max": amount_max or "",
+            "is_paid": is_paid or "",
+            "correspondent_type": correspondent_type or "",
         },
-        "has_filters": any([corr_uuid, dtype_uuid, tag_uuids, search, _date_from, _date_to, _amount_min, _amount_max]),
+        "has_filters": any([corr_uuid, dtype_uuid, tag_uuids, search, _date_from, _date_to, _amount_min, _amount_max, is_paid, correspondent_type]),
         "sort": sort,
         "order": order,
         "sort_base_url": _sort_base_url(f"/year/{year}", _sort_params),
@@ -676,8 +716,8 @@ async def document_update_form(
             session.add(a)
         await session.commit()
 
-    # Rename file if title, document date, or payment date changed
-    if doc.title != old_title or new_date != old_date or doc.payment_date != old_payment_date:
+    # Rename file if title, document date, or payment date changed (skip for manual entries)
+    if not doc.is_manual and doc.file_path and (doc.title != old_title or new_date != old_date or doc.payment_date != old_payment_date):
         new_path = rename_file(old_file_path, doc.id, doc.document_date, doc.title, doc.mime_type, payment_date=doc.payment_date)
         if new_path != old_file_path:
             doc.file_path = new_path
@@ -695,10 +735,11 @@ async def document_delete_form(id: uuid.UUID, session: AsyncSession = Depends(ge
     doc = await session.get(Document, id)
     if not doc:
         raise HTTPException(status_code=404)
-    year, file_path, doc_id = (doc.payment_date or doc.document_date).year, doc.file_path, doc.id
+    year, file_path, doc_id, is_manual = (doc.payment_date or doc.document_date).year, doc.file_path, doc.id, doc.is_manual
     await session.delete(doc)
     await session.commit()
-    delete_file(file_path)
+    if not is_manual and file_path:
+        delete_file(file_path)
     delete_preview(doc_id)
     remaining = await session.scalar(
         select(func.count(Document.id)).where(extract("year", _filing_date) == year)
@@ -1010,6 +1051,132 @@ async def export_tva_csv(
     )
 
 
+@router.get("/reports/export/fec")
+async def export_fec(
+    year: int = Query(...),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """Fichier des Écritures Comptables (FEC) - format DGFiP Art. A47 A-1."""
+    _base = [extract("year", _filing_date) == year, Document.archived == False]
+
+    result = await session.execute(
+        select(Document)
+        .options(selectinload(Document.correspondent), selectinload(Document.document_type))
+        .where(*_base, Document.category.in_([CategoryEnum.depense, CategoryEnum.recette]))
+        .order_by(_filing_date, Document.created_at)
+    )
+    docs = result.scalars().all()
+
+    # Séquences par journal
+    seq: dict[str, int] = {"ACH": 0, "VTE": 0}
+
+    def _next(journal: str) -> str:
+        seq[journal] += 1
+        return f"{journal}{seq[journal]:05d}"
+
+    def _d(d: date | None) -> str:
+        return d.strftime("%Y%m%d") if d else ""
+
+    def _amt(v) -> str:
+        if v is None:
+            return "0.00"
+        return f"{float(v):.2f}"
+
+    # Comptes PCG simplifiés pour freelance
+    _EXPENSE_ACCOUNTS = {
+        "facture":           ("606100", "Achats matières et fournitures"),
+        "reçu":              ("606200", "Petits achats"),
+        "bulletin de salaire": ("641000", "Rémunérations du personnel"),
+        "contrat":           ("611000", "Sous-traitance"),
+    }
+    _DEFAULT_EXPENSE = ("628000", "Autres charges externes")
+    _DEFAULT_REVENUE = ("706000", "Prestations de services")
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter="|")
+    writer.writerow([
+        "JournalCode", "JournalLib", "EcritureNum", "EcritureDate",
+        "CompteNum", "CompteLib", "CompAuxNum", "CompAuxLib",
+        "PieceRef", "PieceDate", "EcritureLib",
+        "Debit", "Credit",
+        "EcritureLet", "DateLet", "ValidDate",
+        "Montantdevise", "Idevise",
+    ])
+
+    ecriture_date_default = f"{year}1231"
+
+    for doc in docs:
+        piece_date = _d(doc.document_date)
+        ecriture_date = _d(doc.payment_date or doc.document_date) or ecriture_date_default
+        piece_ref = doc.title[:17] if doc.title else str(doc.id)[:8]
+        lib = (doc.title or "")[:32]
+        corr_code = (doc.correspondent.slug[:17] if doc.correspondent else "")
+        corr_name = (doc.correspondent.name[:32] if doc.correspondent else "")
+        currency = doc.currency or "EUR"
+
+        # Montants EUR effectifs
+        ttc = doc.amount_ttc_eur if currency != "EUR" and doc.amount_ttc_eur else doc.amount_ttc
+        if not ttc:
+            continue
+        vat = doc.vat_amount or Decimal("0")
+        if currency != "EUR" and doc.amount_ttc and doc.amount_ttc > 0 and doc.amount_ttc_eur:
+            ratio = doc.amount_ttc_eur / doc.amount_ttc
+            vat = (vat * ratio).quantize(Decimal("0.01"))
+        ht = (ttc - vat).quantize(Decimal("0.01"))
+
+        montantdevise = _amt(doc.amount_ttc) if currency != "EUR" else ""
+        idevise = currency if currency != "EUR" else ""
+
+        if doc.category == CategoryEnum.depense:
+            journal_code, journal_lib = "ACH", "Achats"
+            num = _next("ACH")
+            type_name = (doc.document_type.name.lower() if doc.document_type else "")
+            compte_charge, compte_charge_lib = _EXPENSE_ACCOUNTS.get(type_name, _DEFAULT_EXPENSE)
+            # Ligne charge (débit)
+            writer.writerow([journal_code, journal_lib, num, ecriture_date,
+                             compte_charge, compte_charge_lib, "", "",
+                             piece_ref, piece_date, lib,
+                             _amt(ht), "0.00", "", "", ecriture_date, montantdevise, idevise])
+            # Ligne TVA déductible (débit) si TVA > 0
+            if vat:
+                writer.writerow([journal_code, journal_lib, num, ecriture_date,
+                                 "445660", "TVA déductible", "", "",
+                                 piece_ref, piece_date, lib,
+                                 _amt(vat), "0.00", "", "", ecriture_date, "", ""])
+            # Ligne fournisseur (crédit)
+            writer.writerow([journal_code, journal_lib, num, ecriture_date,
+                             "401000", "Fournisseurs", corr_code, corr_name,
+                             piece_ref, piece_date, lib,
+                             "0.00", _amt(ttc), "", "", ecriture_date, montantdevise, idevise])
+
+        else:  # recette
+            journal_code, journal_lib = "VTE", "Ventes"
+            num = _next("VTE")
+            # Ligne client (débit)
+            writer.writerow([journal_code, journal_lib, num, ecriture_date,
+                             "411000", "Clients", corr_code, corr_name,
+                             piece_ref, piece_date, lib,
+                             _amt(ttc), "0.00", "", "", ecriture_date, montantdevise, idevise])
+            # Ligne produit (crédit)
+            writer.writerow([journal_code, journal_lib, num, ecriture_date,
+                             _DEFAULT_REVENUE[0], _DEFAULT_REVENUE[1], "", "",
+                             piece_ref, piece_date, lib,
+                             "0.00", _amt(ht), "", "", ecriture_date, montantdevise, idevise])
+            # Ligne TVA collectée (crédit) si TVA > 0
+            if vat:
+                writer.writerow([journal_code, journal_lib, num, ecriture_date,
+                                 "445710", "TVA collectée", "", "",
+                                 piece_ref, piece_date, lib,
+                                 "0.00", _amt(vat), "", "", ecriture_date, "", ""])
+
+    content = output.getvalue()
+    return StreamingResponse(
+        iter([content.encode("utf-8")]),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="FEC_{year}.txt"'},
+    )
+
+
 # ── Notifications ─────────────────────────────────────────────────────────────
 
 @router.get("/notifications", response_class=HTMLResponse)
@@ -1098,7 +1265,10 @@ async def config(request: Request, session: AsyncSession = Depends(get_session))
 async def config_add_correspondent(request: Request, session: AsyncSession = Depends(get_session)) -> RedirectResponse:
     form = await request.form()
     if name := str(form.get("name", "")).strip():
-        session.add(Correspondent(name=name, slug=slugify(name)))
+        from app.models.correspondent import CorrespondentTypeEnum
+        type_raw = str(form.get("type", "")).strip()
+        corr_type = CorrespondentTypeEnum(type_raw) if type_raw in CorrespondentTypeEnum._value2member_map_ else None
+        session.add(Correspondent(name=name, slug=slugify(name), type=corr_type))
         try:
             await session.commit()
         except IntegrityError:

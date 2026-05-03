@@ -28,6 +28,7 @@ class DocumentCreate(BaseModel):
     amount_ttc: Decimal | None = None
     amount_ttc_eur: Decimal | None = None
     currency: str = "EUR"
+    is_paid: bool | None = None
     notes: str | None = None
     correspondent_id: uuid.UUID | None = None
     document_type_id: uuid.UUID | None = None
@@ -51,6 +52,7 @@ class DocumentUpdate(BaseModel):
     amount_ttc: Decimal | None = None
     amount_ttc_eur: Decimal | None = None
     currency: str | None = None
+    is_paid: bool | None = None
     notes: str | None = None
     archived: bool | None = None
     correspondent_id: uuid.UUID | None = None
@@ -69,9 +71,11 @@ class DocumentResponse(BaseModel):
     id: uuid.UUID
     title: str
     category: CategoryEnum
-    file_hash: str
-    mime_type: str
-    file_size: int
+    is_manual: bool
+    is_paid: bool | None
+    file_hash: str | None
+    mime_type: str | None
+    file_size: int | None
     document_date: date
     payment_date: date | None
     amount_ht: Decimal | None

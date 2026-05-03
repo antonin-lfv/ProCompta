@@ -4,17 +4,17 @@
 
 ### Corrigé - Gmail OAuth & import
 
-- **Erreur 422 sur `/api/gmail/sync`** — le paramètre `request` n'était pas typé `Request`, FastAPI le traitait comme un body requis ; annotation corrigée
-- **PKCE manquant au callback OAuth** — `requests-oauthlib` ≥ 2.0 ajoute automatiquement le `code_challenge` à l'URL d'autorisation ; le `code_verifier` est maintenant généré dans `oauth_start`, stocké en base (`gmail_code_verifier`) et transmis à `flow.fetch_token()` dans `oauth_callback`
-- **URI de redirection invalide** — Google refuse les TLD `.local` ; l'URI est maintenant codée en dur en `http://localhost:{api_port}/api/gmail/oauth/callback`
-- **"0 importé" après suppression d'un document** — la requête `already_imported` rejoignait la table `Document` : un message dont le document a été supprimé n'est plus considéré comme déjà importé
-- **`UniqueViolationError` lors du ré-import** — la contrainte UNIQUE sur `gmail_import_log.gmail_message_id` a été supprimée (migration `0015`) pour autoriser plusieurs logs par message
-- **Credentials Gmail persistants après déconnexion** — suppression du fallback `.env` dans `resolve_credentials()` ; les identifiants ne proviennent plus que de la base de données
+- **Erreur 422 sur `/api/gmail/sync`** - le paramètre `request` n'était pas typé `Request`, FastAPI le traitait comme un body requis ; annotation corrigée
+- **PKCE manquant au callback OAuth** - `requests-oauthlib` ≥ 2.0 ajoute automatiquement le `code_challenge` à l'URL d'autorisation ; le `code_verifier` est maintenant généré dans `oauth_start`, stocké en base (`gmail_code_verifier`) et transmis à `flow.fetch_token()` dans `oauth_callback`
+- **URI de redirection invalide** - Google refuse les TLD `.local` ; l'URI est maintenant codée en dur en `http://localhost:{api_port}/api/gmail/oauth/callback`
+- **"0 importé" après suppression d'un document** - la requête `already_imported` rejoignait la table `Document` : un message dont le document a été supprimé n'est plus considéré comme déjà importé
+- **`UniqueViolationError` lors du ré-import** - la contrainte UNIQUE sur `gmail_import_log.gmail_message_id` a été supprimée (migration `0015`) pour autoriser plusieurs logs par message
+- **Credentials Gmail persistants après déconnexion** - suppression du fallback `.env` dans `resolve_credentials()` ; les identifiants ne proviennent plus que de la base de données
 
 ### Corrigé - Expérience wizard
 
-- **"Identifiants déjà enregistrés" après enregistrement** — `saveCreds()` ne recharge plus la page ; il avance directement à l'étape 3
-- **Instructions étape 1 mises à jour** — détail des 7 étapes Google Cloud Console correspondant au flux réel (projet, activation API, écran de consentement, utilisateurs test, identifiants OAuth)
+- **"Identifiants déjà enregistrés" après enregistrement** - `saveCreds()` ne recharge plus la page ; il avance directement à l'étape 3
+- **Instructions étape 1 mises à jour** - détail des 7 étapes Google Cloud Console correspondant au flux réel (projet, activation API, écran de consentement, utilisateurs test, identifiants OAuth)
 
 ### Ajouté
 
@@ -25,7 +25,7 @@
 
 ### Technique
 
-- Modèle `User` : nouveau champ `gmail_code_verifier` (String 200, nullable) — migration `0014`
+- Modèle `User` : nouveau champ `gmail_code_verifier` (String 200, nullable) - migration `0014`
 - `config.py` : suppression des champs `gmail_client_id/secret/refresh_token` et de la propriété `gmail_configured`
 - `.env` / `.env.example` : suppression des variables Gmail OAuth (configuration exclusivement via l'assistant)
 

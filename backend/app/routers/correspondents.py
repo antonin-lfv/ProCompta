@@ -27,6 +27,7 @@ async def create_correspondent(
         name=data.name,
         slug=data.slug or slugify(data.name),
         notes=data.notes,
+        type=data.type,
     )
     session.add(obj)
     try:

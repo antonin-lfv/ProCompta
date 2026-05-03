@@ -43,10 +43,11 @@ class Document(Base, UUIDMixin, TimestampMixin):
     )
 
     title: Mapped[str] = mapped_column(nullable=False)
-    file_path: Mapped[str] = mapped_column(nullable=False)
-    file_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    mime_type: Mapped[str] = mapped_column(nullable=False)
-    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_manual: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
+    file_path: Mapped[str | None] = mapped_column(nullable=True)
+    file_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(nullable=True)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     document_date: Mapped[date] = mapped_column(Date, nullable=False)
     payment_date: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -58,6 +59,8 @@ class Document(Base, UUIDMixin, TimestampMixin):
     amount_ttc: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     amount_ttc_eur: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
+
+    is_paid: Mapped[bool | None] = mapped_column(nullable=True)
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)

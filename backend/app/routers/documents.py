@@ -220,6 +220,42 @@ async def detect_fields_preview(
     }
 
 
+@router.post("/manual", response_model=DocumentResponse, status_code=201)
+async def create_manual_document(
+    data: DocumentCreate,
+    session: AsyncSession = Depends(get_session),
+) -> Document:
+    """Crée une entrée comptable sans fichier joint."""
+    document_id = uuid.uuid4()
+    doc = Document(
+        id=document_id,
+        title=data.title,
+        category=data.category,
+        document_date=data.document_date,
+        payment_date=data.payment_date,
+        amount_ht=data.amount_ht,
+        vat_amount=data.vat_amount,
+        vat_rate=data.vat_rate,
+        prorata_pct=data.prorata_pct,
+        amount_ttc=data.amount_ttc,
+        amount_ttc_eur=data.amount_ttc_eur,
+        currency=data.currency,
+        is_paid=data.is_paid,
+        notes=data.notes,
+        correspondent_id=data.correspondent_id,
+        document_type_id=data.document_type_id,
+        is_manual=True,
+    )
+    session.add(doc)
+    if data.tag_ids:
+        tags_result = await session.execute(select(Tag).where(Tag.id.in_(data.tag_ids)))
+        doc.tags = list(tags_result.scalars().all())
+    session.add(DocumentActivity(document_id=document_id, event_type=ActivityEventEnum.uploaded))
+    await session.commit()
+    await _sync_notification(doc, session)
+    return await _get_doc_or_404(session, document_id)
+
+
 @router.get("/upload")
 async def upload_get_not_allowed() -> None:
     raise HTTPException(status_code=405, detail="Use POST /upload to upload a file")
@@ -392,6 +428,8 @@ async def get_document_file(id: uuid.UUID, request: Request, session: AsyncSessi
     doc = await session.get(Document, id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    if not doc.file_path:
+        raise HTTPException(status_code=404, detail="Ce document n'a pas de fichier joint (saisie manuelle)")
     path = Path(settings.storage_path) / doc.file_path
     if not path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable")
@@ -509,12 +547,13 @@ async def bulk_delete(body: BulkActionRequest, session: AsyncSession = Depends(g
         select(Document).where(Document.id.in_(body.ids))
     )
     docs = list(result.scalars().all())
-    file_paths = [(doc.file_path, doc.id) for doc in docs]
+    file_info = [(doc.file_path, doc.id, doc.is_manual) for doc in docs]
     for doc in docs:
         await session.delete(doc)
     await session.commit()
-    for file_path, doc_id in file_paths:
-        delete_file(file_path)
+    for file_path, doc_id, is_manual in file_info:
+        if not is_manual and file_path:
+            delete_file(file_path)
         delete_preview(doc_id)
     return {"deleted": len(docs)}
 
@@ -525,9 +564,10 @@ async def delete_document(id: uuid.UUID, session: AsyncSession = Depends(get_ses
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    file_path = doc.file_path
+    file_path, is_manual = doc.file_path, doc.is_manual
     await session.delete(doc)
     await session.commit()
 
-    delete_file(file_path)
+    if not is_manual and file_path:
+        delete_file(file_path)
     delete_preview(id)
