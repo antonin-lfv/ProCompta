@@ -145,19 +145,51 @@ Le script fait tout automatiquement :
 
   La page Profil centralise vos informations personnelles et la gestion des sauvegardes. <strong>Téléchargez</strong> un ZIP contenant le dump SQL et tous vos fichiers, ou <strong>restaurez</strong> une sauvegarde existante (confirmation par mot de passe requise).
 
+  La section <strong>Zone dangereuse</strong> propose deux actions irréversibles : <strong>Supprimer toutes les données</strong> (documents, fichiers, correspondants, tags, rappels, automatisations — votre compte et vos backups sont conservés) et <strong>Réinitialisation complète</strong> (génère les commandes Docker pour supprimer containers, images et volumes, avec bouton copier).
+
   <br clear="all"/>
 </p>
 
 <br>
 
 <p align="left">
+  <img src="images/automatisations.png" alt="Automatisations Gmail" width="420px" align="left"/>
+
   <strong>🤖 Automatisations</strong>
   <br><br>
 
   La page Automatisations permet de connecter ProCompta à votre boîte Gmail via <strong>OAuth 2.0 PKCE</strong> pour récupérer automatiquement les factures reçues par e-mail. Configurez des <strong>sources Gmail</strong> (expéditeurs, mots-clés) et des <strong>rappels automatiques</strong> par e-mail (documents incomplets, échéances à venir). La récupération tourne en arrière-plan et journalise chaque import. La connexion Gmail se déconnecte automatiquement si vous changez d'adresse e-mail dans votre profil.
 </p>
 
----
+<br>
+
+<br>
+
+<p align="left">
+
+  <img src="images/manuelle.png" alt="Saisie manuelle" width="420px" align="right"/>
+
+  <strong>📝 Saisie manuelle</strong>
+  <br><br>
+
+  Créez un document <strong>sans fichier joint</strong> via le bouton "Saisie manuelle" dans la vue année — utile pour les abonnements, notes de frais ou toute écriture sans pièce numérique. ProCompta génère automatiquement un PDF récapitulatif (titre, date, montants, correspondant, type, notes) stocké et prévisualisable comme n'importe quel autre document.
+</p>
+
+<br>
+
+<p align="left">
+
+  <img src="images/onboarding.png" alt="Tour d'onboarding" width="420px" align="left"/>
+
+  <strong>🎓 Tour d'onboarding</strong>
+  <br><br>
+
+  Un tour guidé interactif en <strong>9 étapes</strong> s'affiche automatiquement à la première connexion : navigation, tableau de bord, import, vue annuelle, rapports, configuration, automatisations Gmail et notifications. L'avancement est sauvegardé en `localStorage` et reprend entre les pages. Relancez le tour à tout moment via le bouton <strong>`?`</strong> dans la navbar.
+</p>
+
+<br>
+
+<br>
 
 ## ⌨️ Raccourcis clavier
 
@@ -174,19 +206,22 @@ Le script fait tout automatiquement :
 
 | Catégorie | Détail |
 |-----------|--------|
-| **Import** | PDF / JPEG / PNG, import unitaire ou par lot, détection de doublons (hash SHA-256) |
+| **Import** | PDF / JPEG / PNG, import unitaire ou par lot, saisie manuelle sans fichier, détection de doublons (hash SHA-256) |
 | **Auto-détection** | Date PDF, correspondant et type extraits du contenu (OCR pour les images) |
-| **Organisation** | Correspondants, types de document (12 par défaut), tags colorés (5 par défaut), catégories |
-| **Finances** | Montants HT / TVA / TTC, 6 devises, conversion BCE automatique à la date du document |
+| **Organisation** | Correspondants (client / fournisseur / autre), types de document (12 par défaut), tags colorés (5 par défaut), catégories |
+| **Finances** | Montants HT / TVA / TTC, prorata déductible, 6 devises, conversion BCE automatique à la date du document |
+| **Encaissement** | Statut "À encaisser / Encaissé" sur les recettes, widget dashboard "À encaisser", filtre dédié |
 | **Vues** | Tableau de bord, vue par année, tous les documents, rapports trimestriels TVA |
-| **Recherche** | Recherche par titre, filtres multiples (date, montant, correspondant, type, tags), tri des colonnes |
+| **Recherche** | Recherche par titre, filtres multiples (date, montant, correspondant, type, tags, statut encaissement), filtres sauvegardés (sessionStorage), tri des colonnes |
 | **Actions groupées** | Sélection multiple, archivage / désarchivage / suppression en lot |
-| **Exports** | CSV bilan comptable, CSV TVA trimestrielle, CSV liste des documents |
+| **Exports** | CSV bilan comptable, CSV TVA trimestrielle, CSV liste des documents, FEC (format DGFiP Art. A47 A-1) |
 | **Workflow** | Archivage, journal d'activité par document, notifications documents incomplets |
 | **Gmail** | Connexion OAuth 2.0 PKCE, récupération automatique de factures depuis vos e-mails, sources paramétrables, journal d'import |
 | **Rappels** | Rappels automatiques par e-mail (documents incomplets, échéances), fréquence configurable |
+| **Onboarding** | Tour guidé interactif 9 étapes, déclenché à la première connexion, reprise inter-pages, bouton `?` pour relancer |
 | **Sécurité** | Authentification e-mail + mot de passe, session 30 jours (HMAC signé), protection Zip Slip sur les restaurations |
 | **Backup** | Export ZIP (dump SQL + fichiers), restauration avec confirmation par mot de passe |
+| **Zone dangereuse** | Suppression de toutes les données (compte conservé), réinitialisation complète (commandes Docker générées) |
 | **Ergonomie** | Raccourcis clavier, tooltips, preview intégrée, responsive |
 
 ---
