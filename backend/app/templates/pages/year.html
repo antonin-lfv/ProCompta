@@ -486,7 +486,7 @@ function yearData() {
 {% block content %}
 <div
   id="tour-year-table"
-  class="max-w-7xl mx-auto space-y-6 pb-24"
+  class="pc-wide space-y-6 pb-24"
   x-data="yearData()"
   @dragover.window.prevent="if(!uploading && !batchModal) dragOver = true"
   @dragleave.window="if(!$event.relatedTarget) dragOver = false"

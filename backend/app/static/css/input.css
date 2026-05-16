@@ -9,3 +9,11 @@
 .spin-once {
   animation: spin-once 0.5s ease-in-out;
 }
+
+/* Conteneur responsive pour grands écrans — 80% de la largeur viewport, min 1280px */
+.pc-wide {
+  width: 100%;
+  max-width: clamp(1280px, 80vw, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}

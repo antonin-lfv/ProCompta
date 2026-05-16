@@ -105,7 +105,7 @@ function docsData() {
 {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-6 pb-24"
+<div class="pc-wide space-y-6 pb-24"
      x-data="docsData()"
      @doc-deleted-list.window="selectedIds = selectedIds.filter(id => id !== $event.detail); _notifyBulk()">
 
