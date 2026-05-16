@@ -79,6 +79,37 @@ function yearData() {
       return idx >= (p - 1) * 5 && idx < p * 5;
     },
 
+    // Export modal
+    exportModal: false,
+    exportPeriod: 'year',
+    exportMonth: new Date().getMonth() + 1,
+    exportQuarter: Math.ceil((new Date().getMonth() + 1) / 3),
+    exportLoading: false,
+    triggerExport() {
+      let url = `/api/documents/export?year={{ year }}&period=${this.exportPeriod}`;
+      if (this.exportPeriod === 'month') url += `&value=${this.exportMonth}`;
+      if (this.exportPeriod === 'quarter') url += `&value=${this.exportQuarter}`;
+      this.exportLoading = true;
+      fetch(url)
+        .then(r => {
+          if (!r.ok) return r.json().then(d => { throw new Error(d.detail || 'Erreur export'); });
+          return r.blob();
+        })
+        .then(blob => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          const suffix = this.exportPeriod === 'month'
+            ? `_${['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'][this.exportMonth-1]}`
+            : this.exportPeriod === 'quarter' ? `_T${this.exportQuarter}` : '';
+          a.download = `procompta_{{ year }}${suffix}.zip`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          this.exportModal = false;
+        })
+        .catch(e => alert(e.message))
+        .finally(() => { this.exportLoading = false; });
+    },
+
     // Single file upload
     uploading: false,
     uploadError: '',
@@ -490,6 +521,15 @@ function yearData() {
         </svg>
         Saisie manuelle
       </button>
+      <button
+        @click="exportModal = true"
+        class="relative group inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors">
+        {{ tooltip("Télécharger les documents d'une période en ZIP", "bottom") }}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+        Exporter
+      </button>
       <label class="relative group inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white cursor-pointer hover:bg-indigo-700 transition-colors">
         {{ tooltip("Importer un ou plusieurs fichiers PDF, JPEG ou PNG", "bottom") }}
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
@@ -500,6 +540,89 @@ function yearData() {
       </label>
     </div>
   </div>
+
+  <!-- Modal export -->
+  <template x-teleport="body">
+    <div x-show="exportModal" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @keydown.escape.window="exportModal = false">
+      <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="exportModal = false"></div>
+      <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
+        <h2 class="text-base font-semibold text-slate-800">Exporter {{ year }}</h2>
+
+        <!-- Période -->
+        <div class="space-y-2">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Période</p>
+          <div class="flex gap-2">
+            <button @click="exportPeriod = 'month'"
+              :class="exportPeriod === 'month' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+              class="flex-1 py-2 text-sm font-medium rounded-lg border transition-colors">Mois</button>
+            <button @click="exportPeriod = 'quarter'"
+              :class="exportPeriod === 'quarter' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+              class="flex-1 py-2 text-sm font-medium rounded-lg border transition-colors">Trimestre</button>
+            <button @click="exportPeriod = 'year'"
+              :class="exportPeriod === 'year' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'"
+              class="flex-1 py-2 text-sm font-medium rounded-lg border transition-colors">Année</button>
+          </div>
+        </div>
+
+        <!-- Sélecteur mois -->
+        <div x-show="exportPeriod === 'month'" class="space-y-1.5">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Mois</p>
+          <select x-model.number="exportMonth"
+            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="1">Janvier</option>
+            <option value="2">Février</option>
+            <option value="3">Mars</option>
+            <option value="4">Avril</option>
+            <option value="5">Mai</option>
+            <option value="6">Juin</option>
+            <option value="7">Juillet</option>
+            <option value="8">Août</option>
+            <option value="9">Septembre</option>
+            <option value="10">Octobre</option>
+            <option value="11">Novembre</option>
+            <option value="12">Décembre</option>
+          </select>
+        </div>
+
+        <!-- Sélecteur trimestre -->
+        <div x-show="exportPeriod === 'quarter'" class="space-y-1.5">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Trimestre</p>
+          <select x-model.number="exportQuarter"
+            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="1">T1 — Janvier · Février · Mars</option>
+            <option value="2">T2 — Avril · Mai · Juin</option>
+            <option value="3">T3 — Juillet · Août · Septembre</option>
+            <option value="4">T4 — Octobre · Novembre · Décembre</option>
+          </select>
+        </div>
+
+        <!-- Aperçu nom du fichier -->
+        <p class="text-xs text-slate-400">
+          Fichier :
+          <span class="font-mono" x-text="'procompta_{{ year }}' + (exportPeriod === 'month' ? '_' + ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'][exportMonth-1] : exportPeriod === 'quarter' ? '_T' + exportQuarter : '') + '.zip'"></span>
+        </p>
+
+        <!-- Actions -->
+        <div class="flex gap-3 pt-1">
+          <button @click="exportModal = false"
+            class="flex-1 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+            Annuler
+          </button>
+          <button @click="triggerExport()"
+            :disabled="exportLoading"
+            class="flex-1 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+            <svg x-show="exportLoading" class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span x-text="exportLoading ? 'Génération…' : 'Télécharger'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
 
   <!-- Upload simple : spinner + erreur -->
   <div x-show="uploading || uploadError" x-cloak>

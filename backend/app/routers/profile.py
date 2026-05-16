@@ -124,17 +124,27 @@ async def purge_previews(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> dict:
-    previews_dir = Path(settings.storage_path) / "previews"
-    if not previews_dir.exists():
-        return {"deleted": 0}
+    storage = Path(settings.storage_path)
+    previews_dir = storage / "previews"
 
-    result = await session.execute(select(Document.id))
-    existing_ids = {str(id_) for id_ in result.scalars().all()}
+    result = await session.execute(select(Document.file_path, Document.id))
+    rows = result.all()
+    known_paths = {r.file_path for r in rows if r.file_path}
+    known_ids = {str(r.id) for r in rows}
 
-    deleted = 0
-    for f in previews_dir.glob("*.png"):
-        if f.stem not in existing_ids:
+    deleted_docs = 0
+    for f in storage.rglob("*"):
+        if not f.is_file() or f.is_relative_to(previews_dir):
+            continue
+        if str(f.relative_to(storage)) not in known_paths:
             f.unlink(missing_ok=True)
-            deleted += 1
+            deleted_docs += 1
 
-    return {"deleted": deleted}
+    deleted_previews = 0
+    if previews_dir.exists():
+        for f in previews_dir.glob("*.png"):
+            if f.stem not in known_ids:
+                f.unlink(missing_ok=True)
+                deleted_previews += 1
+
+    return {"deleted": deleted_docs + deleted_previews, "deleted_docs": deleted_docs, "deleted_previews": deleted_previews}

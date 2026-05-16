@@ -1,13 +1,16 @@
 import asyncio
+import io
 import subprocess
 import tempfile
 import uuid
+import zipfile
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import extract, func, select
 from sqlalchemy.exc import IntegrityError
@@ -23,7 +26,7 @@ from app.models.document_activity import ActivityEventEnum, DocumentActivity
 from app.models.document_type import DocumentType
 from app.models.tag import Tag
 from app.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
-from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, hash_bytes, save_file_bytes
+from app.services.file_service import ALLOWED_MIME_TYPES, delete_file, hash_bytes, rename_file, save_file_bytes
 from app.services.preview_service import delete_preview, generate_preview
 
 
@@ -181,12 +184,16 @@ async def _get_doc_or_404(session: AsyncSession, id: uuid.UUID) -> Document:
     return doc
 
 
+def _effective_date_expr():
+    """COALESCE(payment_date, document_date) — date used for year classification."""
+    return func.coalesce(Document.payment_date, Document.document_date)
+
+
 @router.get("/years", response_model=list[int])
 async def list_years(session: AsyncSession = Depends(get_session)) -> list[int]:
+    year_expr = extract("year", _effective_date_expr()).label("year")
     result = await session.execute(
-        select(extract("year", Document.document_date).label("year"))
-        .distinct()
-        .order_by(extract("year", Document.document_date).desc())
+        select(year_expr).distinct().order_by(year_expr.desc())
     )
     return [int(row.year) for row in result.all()]
 
@@ -359,7 +366,7 @@ async def list_documents(
     stmt = select(Document).options(*_with_relations)
 
     if year:
-        stmt = stmt.where(extract("year", Document.document_date) == year)
+        stmt = stmt.where(extract("year", _effective_date_expr()) == year)
     if category:
         stmt = stmt.where(Document.category == category)
     if correspondent_id:
@@ -380,6 +387,84 @@ async def list_documents(
     return list(result.scalars().all())
 
 
+_MONTH_FR = ["janvier", "février", "mars", "avril", "mai", "juin",
+             "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+
+_MIME_EXT_EXPORT = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png"}
+
+
+def _slugify_folder(name: str) -> str:
+    import unicodedata
+    name = unicodedata.normalize("NFD", name)
+    name = "".join(c for c in name if unicodedata.category(c) != "Mn")
+    return "".join(c if c.isalnum() or c in " _-" else "_" for c in name).strip("_")
+
+
+@router.get("/export")
+async def export_documents(
+    year: int,
+    period: str = Query(..., pattern="^(month|quarter|year)$"),
+    value: int | None = None,
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    filing = _effective_date_expr()
+    stmt = (
+        select(Document)
+        .options(selectinload(Document.correspondent))
+        .where(extract("year", filing) == year)
+    )
+
+    if period == "month":
+        if not value or not (1 <= value <= 12):
+            raise HTTPException(status_code=422, detail="value doit être un mois entre 1 et 12")
+        stmt = stmt.where(extract("month", filing) == value)
+        zip_label = f"{year}_{_MONTH_FR[value - 1]}"
+    elif period == "quarter":
+        if not value or not (1 <= value <= 4):
+            raise HTTPException(status_code=422, detail="value doit être un trimestre entre 1 et 4")
+        first_month = (value - 1) * 3 + 1
+        stmt = stmt.where(extract("month", filing).between(first_month, first_month + 2))
+        zip_label = f"{year}_T{value}"
+    else:
+        zip_label = str(year)
+
+    stmt = stmt.order_by(filing.asc())
+    result = await session.execute(stmt)
+    docs = result.scalars().all()
+
+    docs_with_files = [d for d in docs if d.file_path]
+    if not docs_with_files:
+        raise HTTPException(status_code=404, detail="Aucun document avec fichier pour cette période")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        seen: dict[str, int] = {}
+        for doc in docs_with_files:
+            folder = _slugify_folder(doc.correspondent.name) if doc.correspondent else "Sans_correspondant"
+            ext = _MIME_EXT_EXPORT.get(doc.mime_type or "", ".bin")
+            effective = doc.payment_date or doc.document_date
+            base_name = f"{effective.isoformat()}_{_slugify_folder(doc.title)[:40]}{ext}"
+            arc_path = f"{folder}/{base_name}"
+            if arc_path in seen:
+                seen[arc_path] += 1
+                stem = base_name[: -len(ext)]
+                arc_path = f"{folder}/{stem}_{seen[arc_path]}{ext}"
+            else:
+                seen[arc_path] = 0
+
+            full = Path(settings.storage_path) / doc.file_path
+            if full.exists():
+                zf.write(full, arc_path)
+
+    buf.seek(0)
+    filename = f"procompta_{zip_label}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/{id}", response_model=DocumentResponse)
 async def get_document(id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> Document:
     return await _get_doc_or_404(session, id)
@@ -394,9 +479,20 @@ async def update_document(
     update_data = data.model_dump(exclude_unset=True)
     tag_ids = update_data.pop("tag_ids", None)
     old_archived = doc.archived
+    old_file_path = doc.file_path
 
     for field, value in update_data.items():
         setattr(doc, field, value)
+
+    if (
+        not doc.is_manual
+        and old_file_path
+        and doc.mime_type
+        and ("document_date" in update_data or "payment_date" in update_data or "title" in update_data)
+    ):
+        new_path = rename_file(old_file_path, doc.id, doc.document_date, doc.title, doc.mime_type, doc.payment_date)
+        if new_path != old_file_path:
+            doc.file_path = new_path
 
     if tag_ids is not None:
         if tag_ids:
@@ -571,3 +667,5 @@ async def delete_document(id: uuid.UUID, session: AsyncSession = Depends(get_ses
     if not is_manual and file_path:
         delete_file(file_path)
     delete_preview(id)
+
+
