@@ -32,6 +32,17 @@
   opacity: 1;
 }
 
+/* Modale de prévisualisation */
+.pc-preview-modal {
+  max-height: 90vh;
+}
+@media (min-width: 1920px) {
+  .pc-preview-modal {
+    max-width: 60vw;
+    max-height: 75vh;
+  }
+}
+
 /* Lazy rendering des sections hors viewport */
 .doc-section {
   content-visibility: auto;
