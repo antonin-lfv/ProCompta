@@ -212,9 +212,9 @@
           <tr class="border-b border-slate-200 bg-slate-50/50">
             <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Correspondant</th>
             <th class="text-right text-xs font-semibold text-red-400 px-4 py-3">Dépenses TTC</th>
-            <th class="text-right text-xs font-semibold text-red-300 px-4 py-3">TVA déduc.</th>
+            <th class="text-right text-xs font-semibold text-green-400 px-4 py-3">TVA déduc.</th>
             <th class="text-right text-xs font-semibold text-green-500 px-4 py-3">Recettes TTC</th>
-            <th class="text-right text-xs font-semibold text-green-400 px-4 py-3">TVA coll.</th>
+            <th class="text-right text-xs font-semibold text-red-300 px-4 py-3">TVA coll.</th>
             <th class="text-right text-xs font-semibold text-slate-500 px-4 py-3">Solde</th>
           </tr>
         </thead>
@@ -300,9 +300,9 @@
           <tr class="border-b border-slate-200 bg-slate-50/50">
             <th class="text-left text-xs font-semibold text-slate-500 px-4 py-3">Trimestre</th>
             <th class="text-right text-xs font-semibold text-red-400 px-4 py-3">Base HT dépenses</th>
-            <th class="text-right text-xs font-semibold text-red-300 px-4 py-3">TVA déductible</th>
-            <th class="text-right text-xs font-semibold text-green-500 px-4 py-3">Base HT recettes</th>
-            <th class="text-right text-xs font-semibold text-green-400 px-4 py-3">TVA collectée</th>
+            <th class="text-right text-xs font-semibold text-green-400 px-4 py-3">TVA déductible</th>
+            <th class="text-right text-xs font-semibold text-red-400 px-4 py-3">Base HT recettes</th>
+            <th class="text-right text-xs font-semibold text-red-300 px-4 py-3">TVA collectée</th>
             <th class="text-right text-xs font-semibold text-slate-500 px-4 py-3">Solde net TVA</th>
           </tr>
         </thead>
@@ -316,16 +316,16 @@
             <td class="px-4 py-3 text-right text-slate-600">
               {% if row.base_ht_dep %}{{ "%.2f"|format(row.base_ht_dep) }} €{% else %}<span class="text-slate-300">-</span>{% endif %}
             </td>
-            <td class="px-4 py-3 text-right text-red-600 font-medium">
+            <td class="px-4 py-3 text-right text-green-600 font-medium">
               {% if row.tva_ded %}{{ "%.2f"|format(row.tva_ded) }} €{% else %}<span class="text-slate-300">-</span>{% endif %}
             </td>
             <td class="px-4 py-3 text-right text-slate-600">
               {% if row.base_ht_rec %}{{ "%.2f"|format(row.base_ht_rec) }} €{% else %}<span class="text-slate-300">-</span>{% endif %}
             </td>
-            <td class="px-4 py-3 text-right text-green-600 font-medium">
+            <td class="px-4 py-3 text-right text-red-600 font-medium">
               {% if row.tva_col %}{{ "%.2f"|format(row.tva_col) }} €{% else %}<span class="text-slate-300">-</span>{% endif %}
             </td>
-            <td class="px-4 py-3 text-right font-semibold {% if row.solde >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+            <td class="px-4 py-3 text-right font-semibold {% if row.solde >= 0 %}text-red-700{% else %}text-green-700{% endif %}">
               {{ "%+.2f"|format(row.solde) }} €
             </td>
           </tr>
@@ -335,10 +335,10 @@
           <tr class="border-t-2 border-slate-200 bg-slate-50/70">
             <td class="px-4 py-3 text-xs font-bold text-slate-700">Total {{ year }}</td>
             <td class="px-4 py-3 text-right text-xs font-semibold text-slate-600">{{ "%.2f"|format(tva_total.base_ht_dep) }} €</td>
-            <td class="px-4 py-3 text-right text-sm font-bold text-red-600">{{ "%.2f"|format(tva_total.tva_ded) }} €</td>
+            <td class="px-4 py-3 text-right text-sm font-bold text-green-600">{{ "%.2f"|format(tva_total.tva_ded) }} €</td>
             <td class="px-4 py-3 text-right text-xs font-semibold text-slate-600">{{ "%.2f"|format(tva_total.base_ht_rec) }} €</td>
-            <td class="px-4 py-3 text-right text-sm font-bold text-green-600">{{ "%.2f"|format(tva_total.tva_col) }} €</td>
-            <td class="px-4 py-3 text-right text-sm font-bold {% if tva_total.solde >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+            <td class="px-4 py-3 text-right text-sm font-bold text-red-600">{{ "%.2f"|format(tva_total.tva_col) }} €</td>
+            <td class="px-4 py-3 text-right text-sm font-bold {% if tva_total.solde >= 0 %}text-red-700{% else %}text-green-700{% endif %}">
               {{ "%+.2f"|format(tva_total.solde) }} €
             </td>
           </tr>

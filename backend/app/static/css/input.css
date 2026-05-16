@@ -21,3 +21,19 @@
     max-width: 70%;
   }
 }
+
+/* Checkbox de sélection : visible uniquement au survol ou si la card est sélectionnée */
+.doc-card .doc-card-cb {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.doc-card:hover .doc-card-cb,
+.doc-card-selected .doc-card-cb {
+  opacity: 1;
+}
+
+/* Lazy rendering des sections hors viewport */
+.doc-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 400px;
+}
