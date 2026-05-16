@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.6.0] - 2026-05-16
+
+### Ajouté
+
+- **Vue grille dans la vue année** — toggle liste / grille dans l'en-tête de la page année ; la vue grille affiche 4 documents par ligne (max 4 lignes = 16 docs par page) avec mini-preview du document (aperçu PNG servi depuis `/previews/`), correspondant, type (badge couleur), tags (badges), montant TTC et date
+- **Pagination adaptative** — en mode grille, pagination de 16 documents par page par section ; en mode liste, pagination de 5 documents par page (inchangée)
+- **Sélection groupée en vue grille** — checkbox sur chaque card et bouton « Tout sélectionner » dans le header de section ; les actions de suppression / archivage en lot fonctionnent dans les deux vues
+- **Persistance du mode de vue** — le choix liste/grille est sauvegardé dans `localStorage` (`pc_year_view`) et restauré à la prochaine visite
+
+### Technique
+
+- Macro Jinja2 `doc_grid` ajoutée dans `year.html` — rendu grille avec `data-grid-id` sur chaque card pour la synchronisation DOM entre les deux vues
+- `deleteDocRow` mis à jour pour retirer simultanément la ligne de liste et la card de grille correspondante
+- Méthodes Alpine ajoutées dans `yearData()` : `setView`, `gridRowVisible`, `toggleSelectAllGrid`, `areAllSelectedGrid`
+
+---
+
 ## [1.5.3] - 2026-05-03
 
 ### Ajouté

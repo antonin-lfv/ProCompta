@@ -4,6 +4,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
@@ -19,6 +20,7 @@ from app.models.gmail_source import GmailSource
 from app.models.tag import Tag
 from app.models.user import User
 from app.services.file_service import hash_bytes, save_file_bytes
+from app.services.preview_service import generate_preview
 from app.services.gmail_service import (
     GMAIL_SCOPES,
     check_connection,
@@ -76,10 +78,6 @@ class GmailCredentialsBody(BaseModel):
 
 def _redirect_uri(request) -> str:
     return f"http://localhost:{settings.api_port}{_REDIRECT_URI_PATH}"
-
-
-async def _get_user(session: AsyncSession) -> User | None:
-    return await session.scalar(select(User))
 
 
 # ── OAuth setup ───────────────────────────────────────────────────────────────
@@ -394,6 +392,12 @@ async def _run_sync(
             session.add(log)
             errors += 1
             continue
+
+        try:
+            full_path = str(Path(settings.storage_path) / file_path)
+            await generate_preview(full_path, doc_id, "application/pdf")
+        except Exception:
+            pass
 
         doc = Document(
             id=doc_id,
