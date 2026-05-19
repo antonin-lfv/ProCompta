@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -12,6 +13,7 @@ from app.database import get_session
 from app.dependencies import get_current_user
 from app.models.document import Document
 from app.models.user import User
+from app.seed import seed_defaults
 from app.services.auth_service import hash_password, verify_password
 from app.templating import render
 
@@ -54,7 +56,11 @@ async def update_identity(
             user.gmail_oauth_state = None
             user.gmail_code_verifier = None
         user.email = email
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        return RedirectResponse("/profile?error=email_taken", status_code=303)
     return RedirectResponse("/profile?success=identity", status_code=303)
 
 
@@ -107,6 +113,7 @@ async def purge_data(
         RESTART IDENTITY CASCADE
     """))
     await session.commit()
+    await seed_defaults()
 
     storage = Path(settings.storage_path).resolve()
     if storage.exists():

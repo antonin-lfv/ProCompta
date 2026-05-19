@@ -118,7 +118,7 @@ _CAT_ORDER  = {"depense": 0, "recette": 1, "autre": 2}
 
 
 _SORT_COLS: dict[str, object] = {
-    "date":          Document.document_date,
+    "date":          _filing_date,
     "title":         Document.title,
     "amount":        _eur_amount,
     "correspondent": Correspondent.name,
@@ -684,8 +684,10 @@ async def document_update_form(
     await session.commit()
 
     # Resolve new correspondent / type names after commit
-    new_corr_name = (await session.get(Correspondent, doc.correspondent_id)).name if doc.correspondent_id else None
-    new_type_name = (await session.get(DocumentType, doc.document_type_id)).name if doc.document_type_id else None
+    _corr = await session.get(Correspondent, doc.correspondent_id) if doc.correspondent_id else None
+    new_corr_name = _corr.name if _corr else None
+    _dtype = await session.get(DocumentType, doc.document_type_id) if doc.document_type_id else None
+    new_type_name = _dtype.name if _dtype else None
     new_amount = f"{doc.amount_ttc} {doc.currency}" if doc.amount_ttc else None
     new_date = doc.document_date.isoformat() if doc.document_date else None
 
@@ -1116,7 +1118,7 @@ async def export_fec(
 
         # Montants EUR effectifs
         ttc = doc.amount_ttc_eur if currency != "EUR" and doc.amount_ttc_eur else doc.amount_ttc
-        if not ttc:
+        if ttc is None:
             continue
         vat = doc.vat_amount or Decimal("0")
         if currency != "EUR" and doc.amount_ttc and doc.amount_ttc > 0 and doc.amount_ttc_eur:

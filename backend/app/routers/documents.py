@@ -437,6 +437,7 @@ async def export_documents(
         raise HTTPException(status_code=404, detail="Aucun document avec fichier pour cette période")
 
     buf = io.BytesIO()
+    missing: list[str] = []
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         seen: dict[str, int] = {}
         for doc in docs_with_files:
@@ -455,14 +456,16 @@ async def export_documents(
             full = Path(settings.storage_path) / doc.file_path
             if full.exists():
                 zf.write(full, arc_path)
+            else:
+                missing.append(doc.file_path)
 
     buf.seek(0)
     filename = f"procompta_{zip_label}.zip"
-    return StreamingResponse(
-        buf,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    headers: dict[str, str] = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    if missing:
+        import json as _json
+        headers["X-Missing-Files"] = _json.dumps(missing)
+    return StreamingResponse(buf, media_type="application/zip", headers=headers)
 
 
 @router.get("/{id}", response_model=DocumentResponse)

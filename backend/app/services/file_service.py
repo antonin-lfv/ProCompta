@@ -50,8 +50,9 @@ def rename_file(old_path: str, document_id: uuid.UUID, new_date: date, new_title
     old_full = Path(settings.storage_path) / old_path
     new_full = Path(settings.storage_path) / new_path
     new_full.parent.mkdir(parents=True, exist_ok=True)
-    if old_full.exists():
-        old_full.rename(new_full)
+    if not old_full.exists():
+        return old_path
+    old_full.rename(new_full)
     return new_path
 
 
